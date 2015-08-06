@@ -34,8 +34,8 @@ var cubeIndexes = new Uint8Array([
 	20, 21, 22, 20, 22, 23 // back
 ]);
 
-function createCube(gl, a_position, a_color, a_Uv, u_ModelMatrix){
-	var cube = new DrawableObject(gl, a_position, a_color, a_Uv, u_ModelMatrix);
+function createCube(gl, program){
+	var cube = new DrawableObject(gl, program);
 	
 	cube.triangles = cubeIndexes;
 	cube.vertices = cubeVertices;

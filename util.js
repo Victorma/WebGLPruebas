@@ -25,26 +25,93 @@ function enableBuffer(gl, buffer, attribute){
 	}
 };
 
+function initFramebufferObject(gl) {
+	var framebuffer, texture, depthBuffer;
+
+	/*
+	 1. Create a framebuffer object ( gl.createFramebuffer() ).
+	 2. Create a texture object and set its size and parameters ( gl.createTexture() ,
+	 gl.bindTexture() , gl.texImage2D() , gl.Parameteri() ).
+	 3. Create a renderbuffer object ( gl.createRenderbuffer() ).
+	 4. Bind the renderbuffer object to the target and set its size ( gl.bindRenderbuffer() ,
+	 gl.renderbufferStorage() ).
+	 5. Attach the texture object to the color attachment of the framebuffer object
+	 ( gl.bindFramebuffer() , gl.framebufferTexture2D() ).
+	 6. Attach the renderbuffer object to the depth attachment of the framebuffer object
+	 ( gl.framebufferRenderbuffer() ).
+	 7. Check whether the framebuffer object is configured correctly ( gl.checkFramebuffer-
+	 Status() ).
+	 8. Draw using the framebuffer object ( gl.bindFramebuffer() ).
+	 */
+
+	// Create a framebuffer object (FBO)
+	framebuffer = gl.createFramebuffer();
+
+	// Create a texture object and set its size and parameters
+	texture = gl.createTexture(); // Create a texture object
+	gl.bindTexture(gl.TEXTURE_2D, texture);
+	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+	framebuffer.texture = texture; // Store the texture object
+
+	// Create a renderbuffer object and set its size and parameters
+	depthBuffer = gl.createRenderbuffer(); // Create a renderbuffer
+	gl.bindRenderbuffer(gl.RENDERBUFFER, depthBuffer);
+	gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT);
+
+	// Attach the texture and the renderbuffer object to the FBO
+	gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+	gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depthBuffer);
+
+	// Check whether FBO is configured correctly
+	var e = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+	if (e !== gl.FRAMEBUFFER_COMPLETE) {
+		console.log('Framebuffer object is incomplete: ' + e.toString());
+		return error();
+	}
+	return framebuffer;
+}
 /*
  * Shader aux functions
  */
+function createProgramFiles(gl, vertFile, fragFile, callback) {
 
-function loadShaderFile(gl, fileName, shader) {
+	var petition = {};
+
+	loadShaderFile(gl, vertFile, gl.VERTEX_SHADER, petition, callback);
+	loadShaderFile(gl, fragFile, gl.FRAGMENT_SHADER, petition, callback);
+};
+
+function loadShaderFile(gl, fileName, shader, petition, callback) {
 	var request = new XMLHttpRequest();
 	request.onreadystatechange = function() {
 		if (request.readyState === 4 && request.status !== 404) 
-			onLoadShader(gl, request.responseText, shader);
+			onLoadShader(gl, request.responseText, shader, petition, callback);
 	}
 	request.open('GET', fileName, true);
 	request.send(); // Send the request
 };
 
-function onLoadShader(gl, fileString, type) {
+function onLoadShader(gl, fileString, type, petition, callback) {
 	if (type == gl.VERTEX_SHADER) { // The vertex shader is loaded
-		VSHADER_SOURCE = fileString;
+		petition.VSHADER_SOURCE = fileString;
 	} else if (type == gl.FRAGMENT_SHADER) { // The fragment shader is loaded
-		FSHADER_SOURCE = fileString;
+		petition.FSHADER_SOURCE = fileString;
 	}
 	// Start rendering, after loading both shaders
-	if (VSHADER_SOURCE && FSHADER_SOURCE) start(gl);
+	if (petition.VSHADER_SOURCE && petition.FSHADER_SOURCE){
+		var program = createProgram(gl, petition.VSHADER_SOURCE, petition.FSHADER_SOURCE);
+		callback(program);
+	}
+};
+
+
+// Vectores
+function productoEscalar(V, W) {
+	var Nx = (V[1] * W[2]) - (V[2] * W[1]),
+		Ny = (V[2] * W[0]) - (V[0] * W[2]),
+		Nz = (V[0] * W[1]) - (V[1] * W[0]);
+
+	return new Vector3([Nx,Ny,Nz]);
 };
