@@ -1,4 +1,4 @@
-var DrawableObject = function(gl, program) {
+var Renderer = function(gl, program) {
 
 	/**
 	 * Context
@@ -41,14 +41,11 @@ var DrawableObject = function(gl, program) {
 /**
  * On Create called just in creation time
  */
-DrawableObject.prototype.onCreate = function(){
-
-	this.matrix = new Matrix4();
-	this.matrix.setIdentity();
+Renderer.prototype.onCreate = function(){
 
 	this.bufferUvs = this.gl.createBuffer();
 	this.bufferVertices = this.gl.createBuffer();
-	this.bufferColors = this.gl.createBuffer()
+	this.bufferColors = this.gl.createBuffer();
 	this.bufferNormals = this.gl.createBuffer();
 	this.bufferTriangles = this.gl.createBuffer();
 };
@@ -56,7 +53,7 @@ DrawableObject.prototype.onCreate = function(){
 /**
  * On Change program should be called when program is changed
  */
-DrawableObject.prototype.onChangeProgram = function(){
+Renderer.prototype.onChangeProgram = function(){
 	// Program management
 
 	this.a_Position = this.gl.getAttribLocation(lightProgram, "a_Position");
@@ -67,12 +64,12 @@ DrawableObject.prototype.onChangeProgram = function(){
 	this.u_ModelMatrix = this.gl.getUniformLocation(this.program, 'u_ModelMatrix');
 	this.u_NormalMatrix = this.gl.getUniformLocation(this.program, 'u_NormalMatrix');
 
-}
+};
 
 /**
  * On Change points should be called when points are changed
  */
-DrawableObject.prototype.onChangePoints = function(){
+Renderer.prototype.onChangePoints = function(){
 	this.nElem = putBuffer(this.gl, this.gl.ARRAY_BUFFER, this.bufferVertices, this.vertices, 3);
 	putBuffer(this.gl, this.gl.ARRAY_BUFFER, this.bufferUvs, this.uvs, 2);
 	putBuffer(this.gl, this.gl.ARRAY_BUFFER, this.bufferColors, this.colors, 4);
@@ -82,7 +79,7 @@ DrawableObject.prototype.onChangePoints = function(){
 	putBuffer(this.gl, this.gl.ARRAY_BUFFER, this.bufferNormals, this.normals, 3);
 };
 
-DrawableObject.prototype.regenerateNormals = function(){
+Renderer.prototype.regenerateNormals = function(){
 
 	var normalsAux = [];
 
@@ -125,10 +122,16 @@ DrawableObject.prototype.regenerateNormals = function(){
 /**
  * Draw to be called in draw moment
  */
-DrawableObject.prototype.draw = function(){
+Renderer.prototype.onRender = function(scene, shader){
+
+	var bcShader;
+	if(shader){
+		bcShader = this.program;
+		this.program = shader;
+	}
 
 	if(this.gl.program != this.program) {
-		switchProgram(gl, this.program);
+		switchProgram(this.gl, this.program);
 	}
 
 	if(this.program.a_Position !== undefined)
@@ -142,25 +145,28 @@ DrawableObject.prototype.draw = function(){
 
 	enableBuffer(this.gl, this.bufferTriangles);
 
-
 	if(this.program.u_ModelMatrix)
-		this.gl.uniformMatrix4fv(this.program.u_ModelMatrix, false, this.matrix.elements);
+		this.gl.uniformMatrix4fv(this.program.u_ModelMatrix, false, scene.peekMatrix().elements);
 
 	if(this.program.u_NormalMatrix){
 		var normalMatrix = new Matrix4();
-		normalMatrix.setInverseOf(this.matrix);
+		normalMatrix.setInverseOf(scene.peekMatrix());
 		normalMatrix.transpose();
 		this.gl.uniformMatrix4fv(this.program.u_NormalMatrix, false, normalMatrix.elements);
 	}
 
 	//this.gl.drawArrays(this.gl.TRIANGLES, false, this.nElem);
 	this.gl.drawElements(this.gl.TRIANGLES, this.triangles.length, this.gl.UNSIGNED_BYTE, 0);
+
+	if(shader){
+		this.program = bcShader;
+	}
 };
 
 /**
  * On destroy destroys all buffers and temp vars
  */
-DrawableObject.prototype.onDestroy = function(){
+Renderer.prototype.onDestroy = function(){
 	this.gl.destroyBuffer(this.bufferUvs);
 	this.gl.destroyBuffer(this.bufferVertices);
 	this.gl.destroyBuffer(this.bufferColors);

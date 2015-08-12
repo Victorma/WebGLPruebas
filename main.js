@@ -156,11 +156,16 @@ function start(gl) {
 	 * Scene
 	 */
 
-	cube = createCube(gl, gl.program);
-	plane = createPlane(gl, gl.program);
+	scene = new Scene(gl, lightProgram, shadowProgram);
 
-	plane.matrix.setTranslate(0.0,-0.5,0.0);
-	plane.matrix.scale(10.0,1.0,10.0);
+	cube = createCube(gl, lightProgram);
+	plane = createPlane(gl, lightProgram);
+
+	scene.addObject(cube);
+	scene.addObject(plane);
+
+	plane.setTranslate(0.0,-0.5,0.0);
+	plane.scale(10.0,1.0,10.0);
 	// Register the event handler
 	currentAngle = [0.0, 0.0]; // [x-axis, y-axis] degrees
 	initEventHandlers(canvas, currentAngle);
@@ -185,23 +190,12 @@ function draw(gl) {
 	// ROTATION TRANSFORM
 	cubeBackup.set(cube.matrix);
 
-	cube.matrix.rotate(currentAngle[0], 1.0, 0.0, 0.0); // x-axis
-	cube.matrix.rotate(currentAngle[1], 0.0, 1.0, 0.0); // y-axis*/
-	cube.matrix.scale(0.3,0.3,0.3);
+	cube.rotate(currentAngle[0], 1.0, 0.0, 0.0); // x-axis
+	cube.rotate(currentAngle[1], 0.0, 1.0, 0.0); // y-axis*/
+	cube.scale(0.3,0.3,0.3);
 
 	// DEPTH SHADOW CALCULATION
-
-	gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-	gl.viewport(0,0, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT);
-	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-	switchProgram(gl, shadowProgram);
-
-	cube.program = shadowProgram;
-	plane.program = shadowProgram;
-
-	cube.draw();
-	plane.draw();
+	scene.draw();
 
 	/*if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) == gl.FRAMEBUFFER_COMPLETE) {
 		var pixels = new Uint8Array(OFFSCREEN_WIDTH * OFFSCREEN_HEIGHT * 4);
@@ -215,10 +209,6 @@ function draw(gl) {
 	}*/
 
 	// NORMAL DRAW
-
-	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-	gl.viewport(0,0, canvas.width, canvas.height);
-	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
 	cube.program = lightProgram;
 	plane.program = lightProgram;

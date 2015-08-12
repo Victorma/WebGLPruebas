@@ -35,13 +35,16 @@ var cubeIndexes = new Uint8Array([
 ]);
 
 function createCube(gl, program){
-	var cube = new DrawableObject(gl, program);
+	var sceneObject = new SceneObject(gl, program);
+	var renderer = new Renderer(gl, program);
+
+	renderer.triangles = cubeIndexes;
+	renderer.vertices = cubeVertices;
+	renderer.colors = cubeColors;
+	renderer.uvs = cubeUVs;
+	renderer.onChangePoints();
+
+	sceneObject.addComponent(renderer);
 	
-	cube.triangles = cubeIndexes;
-	cube.vertices = cubeVertices;
-	cube.colors = cubeColors;
-	cube.uvs = cubeUVs;
-	cube.onChangePoints();
-	
-	return cube;
+	return sceneObject;
 };

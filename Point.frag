@@ -1,8 +1,17 @@
 precision mediump float;
 
+
+#define MAX_POINT_LIGHTS 4
 // Point
-uniform vec3 u_LightPosition;
-uniform vec3 u_PositionalLight;
+struct PointLight {
+	vec3 position;
+	vec3 color;
+	float range;
+};
+
+uniform int u_NumPointLight;
+uniform PositionalLight u_PointLight[MAX_POINT_LIGHTS];
+
 uniform sampler2D u_ShadowMap;
 
 varying vec3 dirAmb;
@@ -21,9 +30,14 @@ void main() {
 	float visibility = (shadowCoord.z > depth + 0.005) ? 0.7:1.0;
 
 	// Point light
-	vec3 lightDirection = normalize(u_LightPosition - vec3(v_Position));
-	float nDotL = max(dot(lightDirection, normalize(v_Normal)), 0.0);
-	vec3 point = u_PositionalLight * vec3(v_Color) * nDotL;
+	vec3 point = vec3(0.0,0.0,0.0);
+
+	for(int i = 0; i < MAX_POINT_LIGHTS; i++){
+		if(i >= u_NumPositionalLights) break;
+		vec3 lightDirection = normalize(u_PointLight[i].position - vec3(v_Position));
+		float nDotL = max(dot(lightDirection, normalize(v_Normal)), 0.0);
+		point += u_PointLight[i].color * vec3(v_Color) * nDotL;
+	}
 
 	gl_FragColor = vec4((dirAmb + point)* visibility, v_Color.a);
 

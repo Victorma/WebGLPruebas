@@ -18,13 +18,16 @@ var planeIndexes = new Uint8Array([
 ]);
 
 function createPlane(gl, program){
-    var plane = new DrawableObject(gl, program);
+    var sceneObject = new SceneObject(gl, program);
+    var renderer = new Renderer(gl, program);
 
-    plane.triangles = planeIndexes;
-    plane.vertices = planeVertices;
-    plane.colors = planeColors;
-    plane.uvs = planeUVs;
-    plane.onChangePoints();
+    renderer.triangles = planeIndexes;
+    renderer.vertices = planeVertices;
+    renderer.colors = planeColors;
+    renderer.uvs = planeUVs;
+    renderer.onChangePoints();
 
-    return plane;
+    sceneObject.addComponent(renderer);
+
+    return sceneObject;
 };
