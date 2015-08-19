@@ -12,7 +12,6 @@ var SceneObject = function(gl, program) {
      */
 
     this.onCreate();
-    this.onChangeProgram()
 };
 
 /**
@@ -28,24 +27,17 @@ SceneObject.prototype.onCreate = function(){
 };
 
 /**
- * On Create called just in creation time
- */
-SceneObject.prototype.onCreate = function(){
-
-};
-
-/**
  * Draw to be called in draw moment
  */
 SceneObject.prototype.setTranslate =    function(x,y,z){ this.matrix.setTranslate(x,y,z);};
 SceneObject.prototype.setScale =        function(x,y,z){ this.matrix.setScale(x,y,z);};
-SceneObject.prototype.setRotate =       function(x,y,z){ this.matrix.setRotate(x,y,z);};
+SceneObject.prototype.setRotate =       function(angle, x,y,z){ this.matrix.setRotate(angle, x,y,z);};
 SceneObject.prototype.translate =       function(x,y,z){ this.matrix.translate(x,y,z);};
 SceneObject.prototype.scale =           function(x,y,z){ this.matrix.scale(x,y,z);};
-SceneObject.prototype.rotate =          function(x,y,z){ this.matrix.rotate(x,y,z);};
+SceneObject.prototype.rotate =          function(angle, x,y,z){ this.matrix.rotate(angle, x,y,z);};
 
 SceneObject.prototype.addObject = function(o){
-    if(!this.childs.contains(o)) {
+    if(this.childs.indexOf(o) == -1) {
         this.childs.push(o);
         o.setParent(this);
     }
@@ -53,10 +45,10 @@ SceneObject.prototype.addObject = function(o){
 
 SceneObject.prototype.setParent = function(parent){
     if(this.parent)
-        this.parent.removeObject(o);
+        this.parent.removeObject(this);
 
     this.parent = parent;
-    this.parent.addObject(o);
+    this.parent.addObject(this);
 };
 
 SceneObject.prototype.removeObject = function(o){
@@ -85,14 +77,16 @@ SceneObject.prototype.onObjectUpdate = function(object, component) {
 
 SceneObject.prototype.addComponent = function(component){
     this.components.push(component);
+    component.sceneObject = this;
     this.onObjectUpdate(this,component);
 };
 
 /**
  LIFECICLE
+ OnSomething can be OnPreRender, OnRender, OnPostRender, etc.
  */
 
-SceneObject.prototype.onRender = function(scene, shader){
+SceneObject.prototype.onSomething = function(call, scene, shader){
     if(this.components.length == 0 && this.childs.length == 0)
         return;
 
@@ -101,13 +95,12 @@ SceneObject.prototype.onRender = function(scene, shader){
 
     var i;
     for(i = 0; i<this.components.length; i++){
-        if(this.components[i].onRender)
-            this.components[i].onRender(scene, shader);
+        if(this.components[i][call])
+            this.components[i][call](scene, shader);
     }
 
     for(i = 0; i<this.childs.length; i++){
-        if(this.childs[i].onRender)
-            this.childs[i].onRender(scene, shader);
+        this.childs[i].onSomething(call, scene, shader);
     }
 
     scene.popMatrix();

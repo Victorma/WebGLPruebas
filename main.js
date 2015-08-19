@@ -4,7 +4,7 @@ var VSHADER_SOURCE = null;
 var FSHADER_SOURCE = null;
 
 var OFFSCREEN_WIDTH = 1024, OFFSCREEN_HEIGHT = 1024;
-var LIGHT_X = 0, LIGHT_Y = 2, LIGHT_Z = 2;
+var LIGHT_X = 0, LIGHT_Y = 1, LIGHT_Z = 0;
 
 var canvas = null;
 
@@ -51,15 +51,29 @@ function main() {
 		// Light vars
 		//   Ambient
 		lightProgram.u_AmbientLight = gl.getUniformLocation(lightProgram, 'u_AmbientLight');
-		//   Directional
-		lightProgram.u_LightDirection = gl.getUniformLocation(lightProgram, 'u_LightDirection');
-		lightProgram.u_DirectionalLight = gl.getUniformLocation(lightProgram, 'u_DirectionalLight');
-		//   Positional
-		lightProgram.u_LightPosition = gl.getUniformLocation(lightProgram, 'u_LightPosition');
-		lightProgram.u_PositionalLight = gl.getUniformLocation(lightProgram, 'u_PositionalLight');
 
 
-		lightProgram.u_ShadowMap = gl.getUniformLocation(lightProgram, 'u_ShadowMap');
+
+		lightProgram.u_Lights = [];
+		for(var i = 0; i<8; i++){
+			lightProgram.u_Lights[i] = {};
+			/* ** Definition **
+			 * Type 1: Directional
+			 * Type 2: Point
+			 * Type 3: Focus */
+			lightProgram.u_Lights[i].type = gl.getUniformLocation(lightProgram, 'u_Lights[' + i + '].type');
+			lightProgram.u_Lights[i].enabled = gl.getUniformLocation(lightProgram, 'u_Lights[' + i + '].enabled');
+			// General props
+			lightProgram.u_Lights[i].direction = gl.getUniformLocation(lightProgram, 'u_Lights[' + i + '].direction');
+			lightProgram.u_Lights[i].position = gl.getUniformLocation(lightProgram, 'u_Lights[' + i + '].position');
+			lightProgram.u_Lights[i].color = gl.getUniformLocation(lightProgram, 'u_Lights[' + i + '].color');
+			lightProgram.u_Lights[i].range = gl.getUniformLocation(lightProgram, 'u_Lights[' + i + '].range');
+			// Shadows things
+			lightProgram.u_Lights[i].casts = gl.getUniformLocation(lightProgram, 'u_Lights[' + i + '].casts');
+			lightProgram.u_Lights[i].shadows = gl.getUniformLocation(lightProgram, 'u_Shadows[' + i + ']');
+			lightProgram.u_Lights[i].matrix = gl.getUniformLocation(lightProgram, 'u_Lights[' + i + '].matrix');
+		}
+		lightProgram.u_NumLights = gl.getUniformLocation(lightProgram, 'u_NumLights');
 
 		if(shadowProgram)
 			start(gl);
@@ -80,12 +94,10 @@ function main() {
 		if(lightProgram)
 			start(gl);
 	});
-};
+}
 
 var cube;
 var currentAngle;
-
-var framebuffer;
 
 /**
  * Fragment matrices
@@ -109,67 +121,60 @@ function start(gl) {
 	projection = new Matrix4();
 	projection.setPerspective(30, canvas.width/canvas.height, 1,100);
 
+	/**
+	 * Minimal shader config
+	 */
+
+	switchProgram(gl,shadowProgram);
+	gl.uniformMatrix4fv(shadowProgram.u_ProjMatrix, false, projection.elements);
+
 	switchProgram(gl,lightProgram);
-
-
-	/**
-	 * Lights
-	 */
 	// Set the light color (white)
-	gl.uniform3f(lightProgram.u_AmbientLight, 0.05, 0.05, 0.05);
-	gl.uniform3f(lightProgram.u_DirectionalLight, 0, 0, 0);
-	gl.uniform3f(lightProgram.u_PositionalLight, 1.0, 1.0, 1.0);
-	// Set the light direction (in the world coordinate)
-	var lightDirection = new Vector3([0.5, 3.0, 4.0]);
-	var lightPosition = new Vector3([LIGHT_X, LIGHT_Y, LIGHT_Z]);
-
-	lightDirection.normalize(); // Normalize
-
-	gl.uniform3fv(lightProgram.u_LightDirection, lightDirection.elements);
-	gl.uniform3fv(lightProgram.u_LightPosition, lightPosition.elements);
-
-
-	/**
-	 * Shadows
-	 */
-
-	lightCamera = new Matrix4();
-	lightCamera.setLookAt(lightPosition.elements[0],lightPosition.elements[1],lightPosition.elements[2],0,0,0,0,1,0);
-	//lightCamera.setLookAt(3,3,7,0,0,0,0,1,0);
-	gl.uniformMatrix4fv(lightProgram.u_LightViewMatrix, false, lightCamera.elements);
-
-
+	gl.uniform3f(lightProgram.u_AmbientLight, 0.15, 0.15, 0.15);
 	gl.uniformMatrix4fv(lightProgram.u_ViewMatrix, false, camera.elements);
 	gl.uniformMatrix4fv(lightProgram.u_ProjMatrix, false, projection.elements);
 
-	switchProgram(gl,shadowProgram);
 
-	gl.uniformMatrix4fv(shadowProgram.u_ViewMatrix, false, lightCamera.elements);
-	gl.uniformMatrix4fv(shadowProgram.u_ProjMatrix, false, projection.elements);
-
-	framebuffer = initFramebufferObject(gl);
-
-	gl.activeTexture(gl.TEXTURE0); // Set a texture object to the texture unit
-	gl.bindTexture(gl.TEXTURE_2D, framebuffer.texture);
 
 	/**
-	 * Scene
+	 * Scene creation
 	 */
 
 	scene = new Scene(gl, lightProgram, shadowProgram);
 
+	// Directional Light
+	directionalLightObject = new SceneObject(gl, shadowProgram);
+	directionalLight = new Light(gl, shadowProgram);
+	directionalLight.type = 1;
+	directionalLight.direction = new Vector3([0.5, 3.0, 4.0]);
+	directionalLight.color = new Vector3([0.0, 0.0, 0.0]);
+	directionalLight.casts = false;
+	directionalLightObject.addComponent(directionalLight);
+	//scene.addObject(directionalLightObject);
+
+	// Positional Light
+	positionalLightObject = new SceneObject(gl, shadowProgram);
+	positionalLight = new Light(gl, shadowProgram);
+	positionalLight.type = 2;
+	positionalLightObject.setTranslate(LIGHT_X, LIGHT_Y, LIGHT_Z);
+	positionalLight.color = new Vector3([1.0, 1.0, 1.0]);
+	positionalLight.casts = false;
+	positionalLightObject.addComponent(positionalLight);
+	scene.addObject(positionalLightObject);
+
+	// Cube
 	cube = createCube(gl, lightProgram);
-	plane = createPlane(gl, lightProgram);
-
+	cube.setTranslate(0.0, 0.0, 0.0);
 	scene.addObject(cube);
-	scene.addObject(plane);
-
+	// Plane
+	plane = createPlane(gl, lightProgram);
 	plane.setTranslate(0.0,-0.5,0.0);
 	plane.scale(10.0,1.0,10.0);
+	scene.addObject(plane);
+
 	// Register the event handler
 	currentAngle = [0.0, 0.0]; // [x-axis, y-axis] degrees
 	initEventHandlers(canvas, currentAngle);
-
 
 	var tick = function() {
 		draw(gl);
@@ -177,7 +182,7 @@ function start(gl) {
 	};
 	tick();
 
-};
+}
 
 /**
  * Main draw method
@@ -194,36 +199,12 @@ function draw(gl) {
 	cube.rotate(currentAngle[1], 0.0, 1.0, 0.0); // y-axis*/
 	cube.scale(0.3,0.3,0.3);
 
-	// DEPTH SHADOW CALCULATION
 	scene.draw();
-
-	/*if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) == gl.FRAMEBUFFER_COMPLETE) {
-		var pixels = new Uint8Array(OFFSCREEN_WIDTH * OFFSCREEN_HEIGHT * 4);
-		gl.readPixels(0, 0, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-
-		var min = -1;
-		for(var i = 0; i< OFFSCREEN_WIDTH*OFFSCREEN_HEIGHT; i+= 4){
-			if(pixels[i] < min)
-				min = pixels[i];
-		}
-	}*/
-
-	// NORMAL DRAW
-
-	cube.program = lightProgram;
-	plane.program = lightProgram;
-
-	switchProgram(gl, lightProgram);
-
-	gl.uniform1i(lightProgram.u_ShadowMap, 0); // Pass gl.TEXTURE0
-
-	cube.draw();
-	plane.draw();
 
 	// RESTORE MATRIX
 	cube.matrix.set(cubeBackup);
 
-};
+}
 
 function switchProgram(gl, program){
 	gl.useProgram(program);

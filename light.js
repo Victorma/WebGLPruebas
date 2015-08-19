@@ -1,37 +1,13 @@
 /**
  * Created by Victorma on 12/08/2015.
  */
-var Light = function(gl) {
+var Light = function(gl, program) {
 
     /**
      * Context
      */
     this.gl = gl;
     this.program = program;
-
-    /**
-     * Form
-     */
-
-    //this.triangles;
-    //this.uvs;
-    //this.colors;
-    //this.vertices;
-
-    /**
-     * Matrix
-     */
-
-    //this.matrix;
-
-    /**
-     * Buffers
-     */
-
-    //this.bufferUvs;
-    //this.bufferColors;
-    //this.bufferVertices;
-    //this.bufferTriangles;
 
     /**
      * initialization
@@ -41,52 +17,77 @@ var Light = function(gl) {
     this.onChangeProgram();
 };
 
+Light.LightCount = 0;
+Light.LightsConfigured = 0;
+
 /**
  * On Create called just in creation time
  */
 Light.prototype.onCreate = function(){
 
-    this.bufferUvs = this.gl.createBuffer();
-    this.bufferVertices = this.gl.createBuffer();
-    this.bufferColors = this.gl.createBuffer();
-    this.bufferNormals = this.gl.createBuffer();
-    this.bufferTriangles = this.gl.createBuffer();
+    var callbackThis = this;
+    createProgramFiles(this.gl, "LightPoint.vert", "LightPoint.frag", function(lightPointShader){
+
+        switchProgram(callbackThis.gl, callbackThis.lightPointShader);
+
+        lightPointShader.u_ViewMatrix = callbackThis.gl.getUniformLocation(lightPointShader, 'u_ViewMatrix');
+        lightPointShader.u_ProjMatrix = callbackThis.gl.getUniformLocation(lightPointShader, 'u_ProjMatrix');
+        lightPointShader.u_ModelMatrix = callbackThis.gl.getUniformLocation(lightPointShader, "u_ModelMatrix");
+
+        lightPointShader.u_Color = callbackThis.gl.getUniformLocation(lightPointShader, "u_Color");
+
+        lightPointShader.a_Position = callbackThis.gl.getAttribLocation(lightPointShader, "a_Position");
+
+        callbackThis.lightPointShader = lightPointShader;
+    });
+
+    this.number = Light.LightCount;
+    this.type = 0;
+    this.enabled = 1;
+    this.direction = new Vector3([0.0, 0.0, 1.0]);
+    this.color = new Vector3([0.0, 0.0, 0.0]);
+    this.range = 1;
+    this.casts = 0;
+
+    this.framebuffer = initFramebufferObject(this.gl);
+
+    Light.LightCount++;
+};
+
+/**
+ * On Destroy called just in destroy moment
+ */
+Light.prototype.onDestroy = function(){
+    Light.LightCount--;
 };
 
 /**
  * On Change program should be called when program is changed
  */
 Light.prototype.onChangeProgram = function(){
-    // Program management
-
-    this.a_Position = this.gl.getAttribLocation(lightProgram, "a_Position");
-    this.a_Uv = this.gl.getAttribLocation(lightProgram, "a_Uv");
-    this.a_Color = this.gl.getAttribLocation(lightProgram, "a_Color");
-    this.a_Normal  = this.gl.getAttribLocation(lightProgram, "a_Normal");
-
-    this.u_ModelMatrix = this.gl.getUniformLocation(this.program, 'u_ModelMatrix');
-    this.u_NormalMatrix = this.gl.getUniformLocation(this.program, 'u_NormalMatrix');
-
+    switchProgram(this.gl, this.program);
+    this.gl.activeTexture(glTextureIndex(this.gl, this.number));
+    this.gl.bindTexture(this.gl.TEXTURE_2D, this.framebuffer.texture);
 };
-
-/**
- * On Change points should be called when points are changed
- */
-Light.prototype.onChangePoints = function(){
-    this.nElem = putBuffer(this.gl, this.gl.ARRAY_BUFFER, this.bufferVertices, this.vertices, 3);
-    putBuffer(this.gl, this.gl.ARRAY_BUFFER, this.bufferUvs, this.uvs, 2);
-    putBuffer(this.gl, this.gl.ARRAY_BUFFER, this.bufferColors, this.colors, 4);
-    putBuffer(this.gl, this.gl.ELEMENT_ARRAY_BUFFER, this.bufferTriangles, this.triangles, 2);
-
-    this.regenerateNormals();
-    putBuffer(this.gl, this.gl.ARRAY_BUFFER, this.bufferNormals, this.normals, 3);
-};
-
 
 /**
  * Draw to be called in draw moment
  */
-Light.prototype.onPreRenderer = function(lightNumber, shader){
+Light.prototype.onPreRender = function(scene, shader){
+
+    if((!shader || !this.framebuffer.shadowsCalculated) && this.casts) {
+        // Lets generate the shadows
+        switchProgram(this.gl, this.program);
+
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebuffer);
+        this.gl.viewport(0, 0, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT);
+        this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+
+        this.startShadowCalculation();
+        scene.do("onRender", this.program);
+        this.endShadowCalculation();
+        this.framebuffer.shadowsCalculated = true;
+    }
 
     var bcShader;
     if(shader){
@@ -98,41 +99,79 @@ Light.prototype.onPreRenderer = function(lightNumber, shader){
         switchProgram(this.gl, this.program);
     }
 
-    if(this.program.a_Position !== undefined)
-        enableBuffer(this.gl, this.bufferVertices, this.program.a_Position);
-    if(this.program.a_Uv !== undefined)
-        enableBuffer(this.gl, this.bufferUvs, this.program.a_Uv);
-    if(this.program.a_Color !== undefined)
-        enableBuffer(this.gl, this.bufferColors, this.program.a_Color);
-    if(this.program.a_Normal !== undefined)
-        enableBuffer(this.gl, this.bufferNormals, this.program.a_Normal);
+    if(this.program.u_Lights !== undefined && this.program.u_Lights[this.number] !== undefined) {
+        this.gl.uniform1i(this.program.u_Lights[this.number].type, this.type);
+        this.gl.uniform1i(this.program.u_Lights[this.number].enabled, this.enabled);
+        this.direction.normalize();
+        this.gl.uniform3fv(this.program.u_Lights[this.number].direction, this.direction.elements);
 
-    enableBuffer(this.gl, this.bufferTriangles);
+        var position = new Vector3([0.0, 0.0, 0.0]);
+        position = scene.peekMatrix().multiplyVector3(position);
+        this.gl.uniform3fv(this.program.u_Lights[this.number].position, position.elements);
+        this.gl.uniform3fv(this.program.u_Lights[this.number].color, this.color.elements);
+        this.gl.uniform1f(this.program.u_Lights[this.number].range, this.range);
+        this.gl.uniform1i(this.program.u_Lights[this.number].casts, this.casts);
 
-    if(this.program.u_ModelMatrix)
-        this.gl.uniformMatrix4fv(this.program.u_ModelMatrix, false, scene.peekMatrix().elements);
+        this.gl.uniform1i(this.program.u_Lights[this.number].shadows, this.number); // Pass gl.TEXTURE0
 
-    if(this.program.u_NormalMatrix){
-        var normalMatrix = new Matrix4();
-        normalMatrix.setInverseOf(scene.peekMatrix());
-        normalMatrix.transpose();
-        this.gl.uniformMatrix4fv(this.program.u_NormalMatrix, false, normalMatrix.elements);
+        var viewMatrix = new Matrix4();
+        viewMatrix.setIdentity();
+        viewMatrix.setLookAt(position.elements[0], position.elements[1], position.elements[2], 0,0,0,0,1,0);
+
+        this.gl.uniformMatrix4fv(this.program.u_Lights[this.number].matrix, false, viewMatrix.elements);
+
+        this.gl.uniform1i(this.program.u_NumLights, Light.LightsConfigured);
     }
-
-    //this.gl.drawArrays(this.gl.TRIANGLES, false, this.nElem);
-    this.gl.drawElements(this.gl.TRIANGLES, this.triangles.length, this.gl.UNSIGNED_BYTE, 0);
 
     if(shader){
         this.program = bcShader;
     }
 };
 
-/**
- * On destroy destroys all buffers and temp vars
- */
-Renderer.prototype.onDestroy = function(){
-    this.gl.destroyBuffer(this.bufferUvs);
-    this.gl.destroyBuffer(this.bufferVertices);
-    this.gl.destroyBuffer(this.bufferColors);
-    this.gl.destroyBuffer(this.bufferVertices);
+Light.prototype.onRender = function(scene, shader){
+
+    if(this.isCalculatingShadows){
+        var bcShader;
+        if(shader){
+            bcShader = this.program;
+            this.program = shader;
+        }
+
+        if(this.gl.program != this.program) {
+            switchProgram(this.gl, this.program);
+        }
+
+        if(this.program.u_ViewMatrix)
+            this.gl.uniformMatrix4fv(this.program.u_ViewMatrix, false, scene.peekMatrix().elements);
+
+        if(shader) {
+            this.program = bcShader;
+        }
+    }
+
+    if(!shader) { // Standard onRender call is performed without any shader
+
+        if(this.lightPointShader) {
+            switchProgram(this.gl, this.lightPointShader);
+
+            this.gl.vertexAttrib4f(this.lightPointShader.a_Position, 0.0, 0.0, 0.0, 1.0);
+            this.gl.uniform3fv(this.lightPointShader.u_Color, this.color.elements);
+            this.gl.uniformMatrix4fv(this.lightPointShader.u_ModelMatrix, false, scene.peekMatrix().elements);
+            this.gl.uniformMatrix4fv(this.lightPointShader.u_ViewMatrix, false, camera.elements);
+            this.gl.uniformMatrix4fv(this.lightPointShader.u_ProjMatrix, false, projection.elements);
+
+            this.gl.drawArrays(this.gl.POINTS, 0, 1);
+        }
+
+        this.framebuffer.shadowsCalculated = false;
+
+    }
+};
+
+Light.prototype.startShadowCalculation = function(){
+    this.isCalculatingShadows = true;
+};
+
+Light.prototype.endShadowCalculation = function(){
+    this.isCalculatingShadows = false;
 };

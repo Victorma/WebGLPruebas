@@ -2,6 +2,11 @@
  * Created by Victorma on 11/08/2015.
  */
 var Scene = function(gl, lightProgram, shadowProgram) {
+
+    this.gl = gl;
+    this.lightProgram = lightProgram;
+    this.shadowProgram = shadowProgram;
+
     this.rootObject = new SceneObject();
     this.lights = [];
     this.shaders = [];
@@ -12,52 +17,25 @@ var Scene = function(gl, lightProgram, shadowProgram) {
     this.matrixStack.push(identity);
 };
 
-Scene.prototype.generateShadows = function(light){
-    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, light.framebuffer);
-    this.gl.viewport(0,0, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT);
-    this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
-
-    this.onRender(light.program);
-
-};
-
 /**
  * On Create called just in creation time
  */
 Scene.prototype.draw = function(){
-    var i,j;
-
-    for(i = 0; i< this.lights.length; i++){
-        if(this.lights[i].castShadows){
-            this.generateShadows(this.lights[i]);
-        }
-
-        for(j = 0; j< this.shaders.length; j++){
-            this.lights[i].onPreRenderer(this.shaders[j]);
-        }
-    }
-
-    this.onRender();
+    this.do("onPreRender");
+    this.do("onPreRender", lightProgram);
+    this.do("onRender");
 };
 
-Scene.prototype.onRender = function(shader){
-
+Scene.prototype.do = function(call, shader){
     if(shader){
-        this.rootObject.onRender(this,shader);
+        this.rootObject.onSomething(call, this, shader);
     }else{
-
         // If no shader, lets clear the main buffer
         this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
         this.gl.viewport(0,0, canvas.width, canvas.height);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
-        for(i = 0; i< this.lights.length; i++){
-            if(this.lights[i].castShadows){
-                this.generateShadows(this.lights[i]);
-            }
-        }
-
-        this.rootObject.onRender(this);
+        this.rootObject.onSomething(call, this);
     }
 };
 
@@ -66,8 +44,6 @@ Scene.prototype.onRender = function(shader){
  */
 Scene.prototype.addObject = function(o){
     this.rootObject.addObject(o);
-    o.setParent(this);
-    o.notifyParent();
 };
 
 Scene.prototype.removeObject = function(o){
@@ -84,11 +60,11 @@ Scene.prototype.onObjectUpdate = function(objectUpdated, componentAdded){
 };
 
 Scene.prototype.pushMatrix = function(){
-    this.matrixStack.push(this.matrixStack[this.matrixStack.length]);
+    this.matrixStack.push(new Matrix4(this.peekMatrix()));
 };
 
 Scene.prototype.multiplyMatrix = function(otherMatrix){
-    this.matrixStack[this.matrixStack.length].multiply(otherMatrix);
+    this.matrixStack[this.matrixStack.length-1].multiply(otherMatrix);
 };
 
 Scene.prototype.popMatrix = function(){
@@ -96,5 +72,5 @@ Scene.prototype.popMatrix = function(){
 };
 
 Scene.prototype.peekMatrix = function(){
-    return this.matrixStack[this.matrixStack.length];
+    return this.matrixStack[this.matrixStack.length-1];
 };

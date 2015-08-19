@@ -115,3 +115,18 @@ function productoEscalar(V, W) {
 
 	return new Vector3([Nx,Ny,Nz]);
 };
+
+function glTextureIndex(gl, index){
+	switch (index){
+		case 0: return gl.TEXTURE0;
+		case 1: return gl.TEXTURE1;
+		case 2: return gl.TEXTURE2;
+		case 3: return gl.TEXTURE3;
+		case 4: return gl.TEXTURE4;
+		case 5: return gl.TEXTURE5;
+		case 6: return gl.TEXTURE6;
+		case 7: return gl.TEXTURE7;
+	}
+
+	return undefined;
+}

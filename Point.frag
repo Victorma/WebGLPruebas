@@ -1,44 +1,73 @@
 precision mediump float;
+precision mediump int;
 
 
-#define MAX_POINT_LIGHTS 4
-// Point
-struct PointLight {
+#define MAX_LIGHTS 2
+
+struct Light {
+	// Type 1: Directional
+	// Type 2: Point
+	// Type 3: Focational
+	int type;
+	// Light enabled
+	int enabled;
+
+	// Main properties (use depends from type)
+	vec3 direction;
 	vec3 position;
 	vec3 color;
-	float range;
+
+	// Range (<0 means unlimited)
+	float range; // TODO RANGE ATTENUATION
+
+	// ShadowCast
+	int casts;
+
+	mat4 matrix;
 };
 
-uniform int u_NumPointLight;
-uniform PositionalLight u_PointLight[MAX_POINT_LIGHTS];
+uniform int u_NumLights;
+uniform Light u_Lights[MAX_LIGHTS];
+uniform sampler2D u_Shadows[MAX_LIGHTS];
 
-uniform sampler2D u_ShadowMap;
-
-varying vec3 dirAmb;
+varying vec3 ambient;
+varying vec4 v_PositionFromLight[MAX_LIGHTS];
 
 varying vec3 v_Normal;
 varying vec4 v_Position;
-varying vec4 v_PositionFromLight;
 varying vec4 v_Color;
 varying vec4 v_Uv;
 
 void main() {
 
-	vec3 shadowCoord = (v_PositionFromLight.xyz / v_PositionFromLight.w) / 2.0 + 0.5;
-	vec4 rgbaDepth = texture2D(u_ShadowMap, shadowCoord.xy);
-	float depth = rgbaDepth.r; // Retrieve the z value from R
-	float visibility = (shadowCoord.z > depth + 0.005) ? 0.7:1.0;
-
 	// Point light
 	vec3 point = vec3(0.0,0.0,0.0);
+	float visibility = 1.0;
 
-	for(int i = 0; i < MAX_POINT_LIGHTS; i++){
-		if(i >= u_NumPositionalLights) break;
-		vec3 lightDirection = normalize(u_PointLight[i].position - vec3(v_Position));
-		float nDotL = max(dot(lightDirection, normalize(v_Normal)), 0.0);
-		point += u_PointLight[i].color * vec3(v_Color) * nDotL;
+	for(int i = 0; i<MAX_LIGHTS; i++){
+		if(u_Lights[i].enabled == 1){
+			//if(i >= u_NumPositionalLights) break;
+
+			if(u_Lights[i].casts == 1){
+				vec3 shadowCoord = (v_PositionFromLight[i].xyz / v_PositionFromLight[i].w) / 2.0 + 0.5;
+				// Visibility calc
+				visibility = (shadowCoord.z > texture2D(u_Shadows[i], shadowCoord.xy).r + 0.005) ? 0.7:1.0;
+			}
+
+			if(u_Lights[i].type == 1){
+				// Directional light
+				float nDirL = max(dot(u_Lights[i].direction, v_Normal), 0.0);
+				point += (u_Lights[i].color * vec3(u_Lights[i].color) * nDirL) * visibility;
+
+			}else if(u_Lights[i].type == 2){
+				// Point light
+				vec3 lightDirection = normalize(u_Lights[i].position - vec3(v_Position));
+				float nDotL = max(dot(lightDirection, normalize(v_Normal)), 0.0);
+				point += (u_Lights[i].color * vec3(v_Color) * nDotL) * visibility;
+			}
+		}
 	}
 
-	gl_FragColor = vec4((dirAmb + point)* visibility, v_Color.a);
+	gl_FragColor = vec4(ambient * v_Color.xyz + (point * visibility), v_Color.a);
 
 }
