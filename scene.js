@@ -12,31 +12,42 @@ var Scene = function(gl, lightProgram, shadowProgram) {
     this.shaders = [];
 
     this.matrixStack = [];
-    var identity = new Matrix4();
-    identity.setIdentity();
-    this.matrixStack.push(identity);
+    this.identity = new Matrix4();
+    this.identity.setIdentity();
+    this.matrixStack.push(this.identity);
 };
 
 /**
  * On Create called just in creation time
  */
 Scene.prototype.draw = function(){
+    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+    this.gl.viewport(0, 0, canvas.width, canvas.height);
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
     this.do("onPreRender");
     this.do("onPreRender", lightProgram);
     this.do("onRender");
+    this.do("onPostRender");
 };
 
 Scene.prototype.do = function(call, shader){
+    var oldMatrixStack = this.matrixStack;
+    this.matrixStack = [];
+    this.matrixStack.push(this.identity);
+
     if(shader){
         this.rootObject.onSomething(call, this, shader);
     }else{
         // If no shader, lets clear the main buffer
-        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
-        this.gl.viewport(0,0, canvas.width, canvas.height);
-        this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
-
+        if(call == "onRender") {
+            this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+            this.gl.viewport(0, 0, canvas.width, canvas.height);
+            this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+        }
         this.rootObject.onSomething(call, this);
     }
+
+    this.matrixStack = oldMatrixStack;
 };
 
 /**

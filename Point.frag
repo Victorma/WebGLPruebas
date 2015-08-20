@@ -42,22 +42,34 @@ void main() {
 
 	// Point light
 	vec3 point = vec3(0.0,0.0,0.0);
-	float visibility = 1.0;
+
 
 	for(int i = 0; i<MAX_LIGHTS; i++){
+		if(i >= u_NumLights)
+			break;
+
+		float visibility = 1.0;
 		if(u_Lights[i].enabled == 1){
 			//if(i >= u_NumPositionalLights) break;
 
 			if(u_Lights[i].casts == 1){
-				vec3 shadowCoord = (v_PositionFromLight[i].xyz / v_PositionFromLight[i].w) / 2.0 + 0.5;
+				//vec3 shadowCoord = (v_PositionFromLight[i].xyz / v_PositionFromLight[i].w) / 2.0 + 0.5;
 				// Visibility calc
-				visibility = (shadowCoord.z > texture2D(u_Shadows[i], shadowCoord.xy).r + 0.005) ? 0.7:1.0;
+				//visibility = (shadowCoord.z > (texture2D(u_Shadows[i], shadowCoord.xy).r + 0.005)) ? 0.7:1.0;
+				vec3 shadowCoord = (v_PositionFromLight[i].xyz / v_PositionFromLight[i].w) / 2.0 + 0.5;
+				if(shadowCoord.x < 0.0 || shadowCoord.x > 1.0 || shadowCoord.y < 0.0 || shadowCoord.y > 1.0){
+					visibility = 1.0;
+				}else{
+					vec4 rgbaDepth = texture2D(u_Shadows[i], shadowCoord.xy);
+					float depth = rgbaDepth.r; // Retrieve the z value from R
+					visibility = (shadowCoord.z > depth + 0.005) ? 0.7:1.0;
+				}
 			}
 
 			if(u_Lights[i].type == 1){
 				// Directional light
 				float nDirL = max(dot(u_Lights[i].direction, v_Normal), 0.0);
-				point += (u_Lights[i].color * vec3(u_Lights[i].color) * nDirL) * visibility;
+				point += (u_Lights[i].color * vec3(v_Color) * nDirL) * visibility;
 
 			}else if(u_Lights[i].type == 2){
 				// Point light
@@ -68,6 +80,6 @@ void main() {
 		}
 	}
 
-	gl_FragColor = vec4(ambient * v_Color.xyz + (point * visibility), v_Color.a);
+	gl_FragColor = vec4(ambient * v_Color.xyz + point, v_Color.a);
 
 }

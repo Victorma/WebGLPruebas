@@ -70,6 +70,26 @@ Light.prototype.onChangeProgram = function(){
     this.gl.bindTexture(this.gl.TEXTURE_2D, this.framebuffer.texture);
 };
 
+function putImage(gl, destination){
+
+    var data = new Uint8Array(OFFSCREEN_WIDTH * OFFSCREEN_HEIGHT * 4);
+    gl.readPixels(0, 0, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT, gl.RGBA, gl.UNSIGNED_BYTE, data);
+
+    // Create a 2D canvas to store the result
+    var canvas = document.createElement('canvas');
+    canvas.width = OFFSCREEN_WIDTH;
+    canvas.height = OFFSCREEN_HEIGHT;
+    var context = canvas.getContext('2d');
+
+    // Copy the pixels to a 2D canvas
+    var imageData = context.createImageData(OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT);
+    imageData.data.set(data);
+    context.putImageData(imageData, 0, 0);
+
+    var img = document.getElementById(destination);
+    img.src = canvas.toDataURL();
+}
+
 /**
  * Draw to be called in draw moment
  */
@@ -84,7 +104,17 @@ Light.prototype.onPreRender = function(scene, shader){
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
         this.startShadowCalculation();
+
+        var position = new Vector4([0.0, 0.0, 0.0, 1.0]);
+        position = scene.peekMatrix().multiplyVector4(position);
+        var viewMatrix = new Matrix4();
+        viewMatrix.setLookAt(position.elements[0], position.elements[1], position.elements[2], 0,0,0,0,1,0);
+        this.gl.uniformMatrix4fv(this.program.u_ViewMatrix, false, viewMatrix.elements);
+
         scene.do("onRender", this.program);
+
+        //putImage(this.gl, "img"+this.number);
+
         this.endShadowCalculation();
         this.framebuffer.shadowsCalculated = true;
     }
@@ -105,13 +135,15 @@ Light.prototype.onPreRender = function(scene, shader){
         this.direction.normalize();
         this.gl.uniform3fv(this.program.u_Lights[this.number].direction, this.direction.elements);
 
-        var position = new Vector3([0.0, 0.0, 0.0]);
-        position = scene.peekMatrix().multiplyVector3(position);
-        this.gl.uniform3fv(this.program.u_Lights[this.number].position, position.elements);
+        var position = new Vector4([0.0, 0.0, 0.0, 1.0]);
+        position = scene.peekMatrix().multiplyVector4(position);
+        this.gl.uniform3f(this.program.u_Lights[this.number].position, position.elements[0],position.elements[1], position.elements[2]);
         this.gl.uniform3fv(this.program.u_Lights[this.number].color, this.color.elements);
         this.gl.uniform1f(this.program.u_Lights[this.number].range, this.range);
         this.gl.uniform1i(this.program.u_Lights[this.number].casts, this.casts);
 
+        this.gl.activeTexture(glTextureIndex(this.gl, this.number));
+        this.gl.bindTexture(this.gl.TEXTURE_2D, this.framebuffer.texture);
         this.gl.uniform1i(this.program.u_Lights[this.number].shadows, this.number); // Pass gl.TEXTURE0
 
         var viewMatrix = new Matrix4();
@@ -120,7 +152,7 @@ Light.prototype.onPreRender = function(scene, shader){
 
         this.gl.uniformMatrix4fv(this.program.u_Lights[this.number].matrix, false, viewMatrix.elements);
 
-        this.gl.uniform1i(this.program.u_NumLights, Light.LightsConfigured);
+        this.gl.uniform1i(this.program.u_NumLights, Light.LightCount);
     }
 
     if(shader){
@@ -141,13 +173,14 @@ Light.prototype.onRender = function(scene, shader){
             switchProgram(this.gl, this.program);
         }
 
-        if(this.program.u_ViewMatrix)
-            this.gl.uniformMatrix4fv(this.program.u_ViewMatrix, false, scene.peekMatrix().elements);
-
         if(shader) {
             this.program = bcShader;
         }
     }
+};
+
+Light.prototype.onPostRender = function(scene, shader){
+
 
     if(!shader) { // Standard onRender call is performed without any shader
 
@@ -160,7 +193,11 @@ Light.prototype.onRender = function(scene, shader){
             this.gl.uniformMatrix4fv(this.lightPointShader.u_ViewMatrix, false, camera.elements);
             this.gl.uniformMatrix4fv(this.lightPointShader.u_ProjMatrix, false, projection.elements);
 
+            this.gl.depthMask(false);
+
             this.gl.drawArrays(this.gl.POINTS, 0, 1);
+
+            this.gl.depthMask(true);
         }
 
         this.framebuffer.shadowsCalculated = false;

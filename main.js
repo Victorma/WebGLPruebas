@@ -4,9 +4,10 @@ var VSHADER_SOURCE = null;
 var FSHADER_SOURCE = null;
 
 var OFFSCREEN_WIDTH = 1024, OFFSCREEN_HEIGHT = 1024;
-var LIGHT_X = 0, LIGHT_Y = 1, LIGHT_Z = 0;
+var LIGHT_X = 0, LIGHT_Y = 0, LIGHT_Z = 3;
 
 var canvas = null;
+var img = null;
 
 var camera = new Matrix4();
 var lightCamera = new Matrix4();
@@ -55,7 +56,7 @@ function main() {
 
 
 		lightProgram.u_Lights = [];
-		for(var i = 0; i<8; i++){
+		for(var i = 0; i<2; i++){
 			lightProgram.u_Lights[i] = {};
 			/* ** Definition **
 			 * Type 1: Directional
@@ -110,6 +111,8 @@ function start(gl) {
 
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
 	gl.enable(gl.DEPTH_TEST);
+	gl.enable(gl.BLEND);
+	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
 	/**
 	 * Camera and projection
@@ -117,9 +120,14 @@ function start(gl) {
 
 	camera = new Matrix4();
 	camera.setLookAt(3,3,7,0,0,0,0,1,0);
+	//camera.setLookAt(LIGHT_X,LIGHT_Y,LIGHT_Z,0,0,0,0,1,0);
 
 	projection = new Matrix4();
 	projection.setPerspective(30, canvas.width/canvas.height, 1,100);
+
+	var identity = new Matrix4();
+	identity.setIdentity();
+
 
 	/**
 	 * Minimal shader config
@@ -142,29 +150,35 @@ function start(gl) {
 
 	scene = new Scene(gl, lightProgram, shadowProgram);
 
-	// Directional Light
-	directionalLightObject = new SceneObject(gl, shadowProgram);
-	directionalLight = new Light(gl, shadowProgram);
-	directionalLight.type = 1;
-	directionalLight.direction = new Vector3([0.5, 3.0, 4.0]);
-	directionalLight.color = new Vector3([0.0, 0.0, 0.0]);
-	directionalLight.casts = false;
-	directionalLightObject.addComponent(directionalLight);
-	//scene.addObject(directionalLightObject);
 
 	// Positional Light
 	positionalLightObject = new SceneObject(gl, shadowProgram);
 	positionalLight = new Light(gl, shadowProgram);
 	positionalLight.type = 2;
 	positionalLightObject.setTranslate(LIGHT_X, LIGHT_Y, LIGHT_Z);
-	positionalLight.color = new Vector3([1.0, 1.0, 1.0]);
-	positionalLight.casts = false;
+	positionalLight.color = new Vector3([0.8, 0.4, 0.4]);
+	positionalLight.casts = 1;
 	positionalLightObject.addComponent(positionalLight);
 	scene.addObject(positionalLightObject);
 
+	// Directional Light
+	directionalLightObject = new SceneObject(gl, shadowProgram);
+	directionalLight = new Light(gl, shadowProgram);
+	directionalLight.type = 1;
+	directionalLight.direction = new Vector3([4.0, 4.0, 0.0]);
+	directionalLightObject.setTranslate(
+		directionalLight.direction.elements[0],
+		directionalLight.direction.elements[1],
+		directionalLight.direction.elements[2]);
+	directionalLight.color = new Vector3([0.1, 0.1, 0.1]);
+	directionalLight.casts = 1;
+	directionalLightObject.addComponent(directionalLight);
+	scene.addObject(directionalLightObject);
+
+
 	// Cube
 	cube = createCube(gl, lightProgram);
-	cube.setTranslate(0.0, 0.0, 0.0);
+	cube.setTranslate(0.0, 0.0, 1.0);
 	scene.addObject(cube);
 	// Plane
 	plane = createPlane(gl, lightProgram);

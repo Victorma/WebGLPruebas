@@ -8,5 +8,5 @@ void main() {
 
     vec4 a = a_Position;
     gl_Position = u_ProjMatrix * u_ViewMatrix * u_ModelMatrix * vec4(0.0, 0.0, 0.0, 1.0);
-    gl_PointSize = 10.0;
+    gl_PointSize = 50.0;
 }

@@ -59,8 +59,6 @@ void main() {
 	for(int i = 0; i<MAX_LIGHTS; i++){
 		if(i < u_NumLights){
 			v_PositionFromLight[i] = u_ProjMatrix * u_Lights[i].matrix * v_Position;
-		}else{
-			v_PositionFromLight[i] = vec4(0.0,0.0,0.0,0.0);
 		}
 	}
 
