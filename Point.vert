@@ -50,6 +50,8 @@ varying vec4 v_Position;
 varying vec4 v_Color;
 varying vec4 v_Uv;
 
+
+
 void main() {
 	// Vertex position
 	v_Position = u_ModelMatrix * a_Position;
@@ -58,7 +60,7 @@ void main() {
 
 	for(int i = 0; i<MAX_LIGHTS; i++){
 		if(i < u_NumLights){
-			v_PositionFromLight[i] = u_ProjMatrix * u_Lights[i].matrix * v_Position;
+			v_PositionFromLight[i] = u_Lights[i].matrix * v_Position;
 		}
 	}
 

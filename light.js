@@ -49,6 +49,12 @@ Light.prototype.onCreate = function(){
     this.range = 1;
     this.casts = 0;
 
+    this.bias = new Matrix4(
+        [0.5, 0.0, 0.0, 0.0,
+            0.0, 0.5, 0.0, 0.0,
+            0.0, 0.0, 0.5, 0.0,
+            0.5, 0.5, 0.5, 1.0]);
+
     this.framebuffer = initFramebufferObject(this.gl);
 
     Light.LightCount++;
@@ -59,6 +65,10 @@ Light.prototype.onCreate = function(){
  */
 Light.prototype.onDestroy = function(){
     Light.LightCount--;
+};
+
+Light.prototype.onParametersChanged = function(){
+    this.needToRecalculate = true;
 };
 
 /**
@@ -95,6 +105,34 @@ function putImage(gl, destination){
  */
 Light.prototype.onPreRender = function(scene, shader){
 
+
+    if(this.needToRecalculate){
+        this.needToRecalculate = false;
+
+        this.projection = new Matrix4();
+        this.view = new Matrix4();
+        this.projection.setIdentity();
+        this.view.setIdentity();
+
+        if(this.type == 1){
+            this.view.setLookAt(
+                this.direction.elements[0]*3,
+                this.direction.elements[1]*3,
+                this.direction.elements[2]*3,
+                0,0,0,0,1,0);
+            this.projection.setOrtho(-10, 10, -10, 10, 0.01 , 100);
+        }else if(this.type == 2 || this.type == 3){
+            var position = new Vector4([0.0, 0.0, 0.0, 1.0]);
+            position = scene.peekMatrix().multiplyVector4(position);
+            this.view.setLookAt(position.elements[0], position.elements[1], position.elements[2], 0,0,0,0,1,0);
+            this.projection.setPerspective(60, OFFSCREEN_WIDTH/OFFSCREEN_HEIGHT, 0.1, 100);
+        }
+
+        this.matrix = /*new Matrix4(this.bias).multiply*/(new Matrix4(this.projection).multiply(new Matrix4(this.view)));
+
+        //this.matrix = /*this.bias.multiply*/(this.projection.multiply(this.view));
+    }
+
     if((!shader || !this.framebuffer.shadowsCalculated) && this.casts) {
         // Lets generate the shadows
         switchProgram(this.gl, this.program);
@@ -105,11 +143,8 @@ Light.prototype.onPreRender = function(scene, shader){
 
         this.startShadowCalculation();
 
-        var position = new Vector4([0.0, 0.0, 0.0, 1.0]);
-        position = scene.peekMatrix().multiplyVector4(position);
-        var viewMatrix = new Matrix4();
-        viewMatrix.setLookAt(position.elements[0], position.elements[1], position.elements[2], 0,0,0,0,1,0);
-        this.gl.uniformMatrix4fv(this.program.u_ViewMatrix, false, viewMatrix.elements);
+        this.gl.uniformMatrix4fv(this.program.u_ProjMatrix, false, this.projection.elements);
+        this.gl.uniformMatrix4fv(this.program.u_ViewMatrix, false, this.view.elements);
 
         scene.do("onRender", this.program);
 
@@ -146,11 +181,8 @@ Light.prototype.onPreRender = function(scene, shader){
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.framebuffer.texture);
         this.gl.uniform1i(this.program.u_Lights[this.number].shadows, this.number); // Pass gl.TEXTURE0
 
-        var viewMatrix = new Matrix4();
-        viewMatrix.setIdentity();
-        viewMatrix.setLookAt(position.elements[0], position.elements[1], position.elements[2], 0,0,0,0,1,0);
 
-        this.gl.uniformMatrix4fv(this.program.u_Lights[this.number].matrix, false, viewMatrix.elements);
+        this.gl.uniformMatrix4fv(this.program.u_Lights[this.number].matrix, false, this.matrix.elements);
 
         this.gl.uniform1i(this.program.u_NumLights, Light.LightCount);
     }

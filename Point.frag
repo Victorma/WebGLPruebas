@@ -38,6 +38,9 @@ varying vec4 v_Position;
 varying vec4 v_Color;
 varying vec4 v_Uv;
 
+const float numLayers = 4.0;
+const float factor = 1.0/numLayers;
+
 void main() {
 
 	// Point light
@@ -69,12 +72,16 @@ void main() {
 			if(u_Lights[i].type == 1){
 				// Directional light
 				float nDirL = max(dot(u_Lights[i].direction, v_Normal), 0.0);
+				nDirL = floor(nDirL*numLayers)*factor;
 				point += (u_Lights[i].color * vec3(v_Color) * nDirL) * visibility;
 
 			}else if(u_Lights[i].type == 2){
 				// Point light
 				vec3 lightDirection = normalize(u_Lights[i].position - vec3(v_Position));
 				float nDotL = max(dot(lightDirection, normalize(v_Normal)), 0.0);
+				nDotL = floor(nDotL*numLayers)*factor;
+				if(nDotL == 0.0)
+					nDotL = factor*0.5;
 				point += (u_Lights[i].color * vec3(v_Color) * nDotL) * visibility;
 			}
 		}

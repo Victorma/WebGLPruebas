@@ -159,10 +159,11 @@ function start(gl) {
 	positionalLight.color = new Vector3([0.8, 0.4, 0.4]);
 	positionalLight.casts = 1;
 	positionalLightObject.addComponent(positionalLight);
+	positionalLight.onParametersChanged();
 	scene.addObject(positionalLightObject);
 
 	// Directional Light
-	directionalLightObject = new SceneObject(gl, shadowProgram);
+	/*directionalLightObject = new SceneObject(gl, shadowProgram);
 	directionalLight = new Light(gl, shadowProgram);
 	directionalLight.type = 1;
 	directionalLight.direction = new Vector3([4.0, 4.0, 0.0]);
@@ -173,7 +174,8 @@ function start(gl) {
 	directionalLight.color = new Vector3([0.1, 0.1, 0.1]);
 	directionalLight.casts = 1;
 	directionalLightObject.addComponent(directionalLight);
-	scene.addObject(directionalLightObject);
+	directionalLight.onParametersChanged();
+	scene.addObject(directionalLightObject);*/
 
 
 	// Cube
