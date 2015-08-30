@@ -25,8 +25,8 @@ function enableBuffer(gl, buffer, attribute){
 	}
 };
 
-function initFramebufferObject(gl) {
-	var framebuffer, texture, depthBuffer;
+function initFramebufferObject(gl, textureType) {
+	var framebuffer = [], texture, depthBuffer;
 
 	/*
 	 1. Create a framebuffer object ( gl.createFramebuffer() ).
@@ -44,32 +44,51 @@ function initFramebufferObject(gl) {
 	 8. Draw using the framebuffer object ( gl.bindFramebuffer() ).
 	 */
 
-	// Create a framebuffer object (FBO)
-	framebuffer = gl.createFramebuffer();
+	// DEFINE TEXTURE TYPE
+	if(textureType === undefined)
+		textureType = gl.TEXTURE_2D;
+
+	var faceDef = [];
+
+	if(textureType === gl.TEXTURE_2D)
+		faceDef[0] = gl.TEXTURE_2D;
+	else for(var face = 0; face<6; face++)
+			faceDef[face] = gl.TEXTURE_CUBE_MAP_POSITIVE_X + face;
+
 
 	// Create a texture object and set its size and parameters
 	texture = gl.createTexture(); // Create a texture object
-	gl.bindTexture(gl.TEXTURE_2D, texture);
-	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-	framebuffer.texture = texture; // Store the texture object
+	gl.bindTexture(textureType, texture);
+	gl.texParameteri(textureType, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+	gl.texParameteri(textureType, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+	gl.texParameteri(textureType, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+	gl.texParameteri(textureType, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-	// Create a renderbuffer object and set its size and parameters
-	depthBuffer = gl.createRenderbuffer(); // Create a renderbuffer
-	gl.bindRenderbuffer(gl.RENDERBUFFER, depthBuffer);
-	gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT);
+	for(var face = 0; face<faceDef.length; face++) {
+		gl.texImage2D(faceDef[face], 0, gl.RGBA, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 
-	// Attach the texture and the renderbuffer object to the FBO
-	gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-	gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depthBuffer);
+		// Create a framebuffer object (FBO)
+		framebuffer[face] = gl.createFramebuffer();
+		framebuffer[face].texture = texture; // Store the texture object
 
-	// Check whether FBO is configured correctly
-	var e = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
-	if (e !== gl.FRAMEBUFFER_COMPLETE) {
-		console.log('Framebuffer object is incomplete: ' + e.toString());
-		return error();
+		// Create a renderbuffer object and set its size and parameters
+		depthBuffer = gl.createRenderbuffer(); // Create a renderbuffer
+		gl.bindRenderbuffer(gl.RENDERBUFFER, depthBuffer);
+		gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT);
+
+		// Attach the texture and the renderbuffer object to the FBO
+		gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer[face]);
+		gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, faceDef[face], texture, 0);
+		gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depthBuffer);
+
+		// Check whether FBO is configured correctly
+		var e = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+		if (e !== gl.FRAMEBUFFER_COMPLETE) {
+			console.log('Framebuffer object is incomplete: ' + e.toString());
+			return error();
+		}
 	}
+
 	return framebuffer;
 }
 /*

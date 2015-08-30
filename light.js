@@ -49,13 +49,12 @@ Light.prototype.onCreate = function(){
     this.range = 1;
     this.casts = 0;
 
-    this.bias = new Matrix4(
-        [0.5, 0.0, 0.0, 0.0,
+    this.bias = new Matrix4({
+        elements : [0.5, 0.0, 0.0, 0.0,
             0.0, 0.5, 0.0, 0.0,
             0.0, 0.0, 0.5, 0.0,
-            0.5, 0.5, 0.5, 1.0]);
-
-    this.framebuffer = initFramebufferObject(this.gl);
+            0.5, 0.5, 0.5, 1.0]
+    });
 
     Light.LightCount++;
 };
@@ -76,8 +75,6 @@ Light.prototype.onParametersChanged = function(){
  */
 Light.prototype.onChangeProgram = function(){
     switchProgram(this.gl, this.program);
-    this.gl.activeTexture(glTextureIndex(this.gl, this.number));
-    this.gl.bindTexture(this.gl.TEXTURE_2D, this.framebuffer.texture);
 };
 
 function putImage(gl, destination){
@@ -121,14 +118,47 @@ Light.prototype.onPreRender = function(scene, shader){
                 this.direction.elements[2]*3,
                 0,0,0,0,1,0);
             this.projection.setOrtho(-10, 10, -10, 10, 0.01 , 100);
+
+            this.framebuffer = initFramebufferObject(this.gl)[0];
+            this.matrix = new Matrix4(this.bias).multiply(new Matrix4(this.projection).multiply(new Matrix4(this.view)));
+
         }else if(this.type == 2 || this.type == 3){
             var position = new Vector4([0.0, 0.0, 0.0, 1.0]);
             position = scene.peekMatrix().multiplyVector4(position);
-            this.view.setLookAt(position.elements[0], position.elements[1], position.elements[2], 0,0,0,0,1,0);
-            this.projection.setPerspective(60, OFFSCREEN_WIDTH/OFFSCREEN_HEIGHT, 0.1, 100);
+
+            this.view = [];
+
+            var p = position.elements;
+
+            this.faceDirections = [
+                new Vector3([ 1,0,0]), //  X
+                new Vector3([-1,0,0]), // -X
+                new Vector3([0, 1,0]), //  Y
+                new Vector3([0,-1,0]), // -Y
+                new Vector3([0,0, 1]), //  Z
+                new Vector3([0,0,-1])];// -Z
+
+            this.upDirections = [
+                new Vector3([ 0,1,0]), //  X
+                new Vector3([ 0,1,0]), // -X
+                new Vector3([-1,0,0]), //  Y
+                new Vector3([ 1,0,0]), // -Y
+                new Vector3([ 0,1,0]), //  Z
+                new Vector3([ 0,1,0])];// -Z
+
+            for(var i = 0; i<6; i++) {
+                this.view[i] = new Matrix4();
+                this.view[i].setIdentity();
+                var fd = this.faceDirections[i].elements;
+                var ud = this.upDirections[i].elements;
+                this.view[i].setLookAt(p[0], p[1], p[2], p[0]+fd[0], p[1]+fd[1], p[2]+fd[2],ud[0],ud[1],ud[2]);
+            }
+
+            this.projection.setPerspective(90, OFFSCREEN_WIDTH/OFFSCREEN_HEIGHT, 1, 100);
+            this.framebuffer = initFramebufferObject(this.gl, this.gl.TEXTURE_CUBE_MAP);
+            this.matrix = /*new Matrix4(this.bias).multiply*/(new Matrix4(this.projection).multiply(new Matrix4(this.view[0])));
         }
 
-        this.matrix = /*new Matrix4(this.bias).multiply*/(new Matrix4(this.projection).multiply(new Matrix4(this.view)));
 
         //this.matrix = /*this.bias.multiply*/(this.projection.multiply(this.view));
     }
@@ -137,18 +167,35 @@ Light.prototype.onPreRender = function(scene, shader){
         // Lets generate the shadows
         switchProgram(this.gl, this.program);
 
-        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebuffer);
-        this.gl.viewport(0, 0, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT);
-        this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
-
         this.startShadowCalculation();
 
-        this.gl.uniformMatrix4fv(this.program.u_ProjMatrix, false, this.projection.elements);
-        this.gl.uniformMatrix4fv(this.program.u_ViewMatrix, false, this.view.elements);
+        if(this.type == 1){
+            this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebuffer);
+            this.gl.viewport(0, 0, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT);
+            this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
-        scene.do("onRender", this.program);
 
-        //putImage(this.gl, "img"+this.number);
+            this.gl.uniformMatrix4fv(this.program.u_ProjMatrix, false, this.projection.elements);
+            this.gl.uniformMatrix4fv(this.program.u_ViewMatrix, false, this.view.elements);
+
+            scene.do("onRender", this.program);
+
+            putImage(this.gl, "img"+(this.number));
+        }else if(this.type == 2){
+            this.gl.uniformMatrix4fv(this.program.u_ProjMatrix, false, this.projection.elements);
+            // Render 6 times for cubemap
+            for(var i = 0; i<6; i++){
+                this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebuffer[i]);
+                this.gl.viewport(0, 0, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT);
+                this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+
+                this.gl.uniformMatrix4fv(this.program.u_ViewMatrix, false, this.view[i].elements);
+                scene.do("onRender", this.program);
+                //putImage(this.gl, "img"+(this.number+i));
+            }
+        }
+
+        //
 
         this.endShadowCalculation();
         this.framebuffer.shadowsCalculated = true;
@@ -178,9 +225,13 @@ Light.prototype.onPreRender = function(scene, shader){
         this.gl.uniform1i(this.program.u_Lights[this.number].casts, this.casts);
 
         this.gl.activeTexture(glTextureIndex(this.gl, this.number));
-        this.gl.bindTexture(this.gl.TEXTURE_2D, this.framebuffer.texture);
-        this.gl.uniform1i(this.program.u_Lights[this.number].shadows, this.number); // Pass gl.TEXTURE0
-
+        if(this.type == 1){
+            this.gl.bindTexture(this.gl.TEXTURE_2D, this.framebuffer.texture);
+            this.gl.uniform1i(this.program.u_Lights[this.number].shadows, this.number); // Pass gl.TEXTURE0
+        }else if(this.type == 2){
+            this.gl.bindTexture(this.gl.TEXTURE_CUBE_MAP, this.framebuffer[0].texture);
+            this.gl.uniform1i(this.program.u_Lights[this.number].shadowsCube, this.number); // Pass gl.TEXTURE0
+        }
 
         this.gl.uniformMatrix4fv(this.program.u_Lights[this.number].matrix, false, this.matrix.elements);
 

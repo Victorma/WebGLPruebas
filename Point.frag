@@ -28,7 +28,8 @@ struct Light {
 
 uniform int u_NumLights;
 uniform Light u_Lights[MAX_LIGHTS];
-uniform sampler2D u_Shadows[MAX_LIGHTS];
+uniform sampler2D u_Shadows;
+uniform samplerCube u_ShadowsCube;
 
 varying vec3 ambient;
 varying vec4 v_PositionFromLight[MAX_LIGHTS];
@@ -41,11 +42,22 @@ varying vec4 v_Uv;
 const float numLayers = 4.0;
 const float factor = 1.0/numLayers;
 
+float unpack(vec4 rgbaDepth){
+	return rgbaDepth.r;
+}
+
+float pointLightDepth(samplerCube sampler, vec3 direction){
+	return unpack(textureCube(sampler, direction.xyz));
+}
+
+float directionalLightDepth(sampler2D sampler, vec3 coord){
+	return unpack(texture2D(sampler, coord.xy));
+}
+
 void main() {
 
 	// Point light
 	vec3 point = vec3(0.0,0.0,0.0);
-
 
 	for(int i = 0; i<MAX_LIGHTS; i++){
 		if(i >= u_NumLights)
@@ -59,14 +71,18 @@ void main() {
 				//vec3 shadowCoord = (v_PositionFromLight[i].xyz / v_PositionFromLight[i].w) / 2.0 + 0.5;
 				// Visibility calc
 				//visibility = (shadowCoord.z > (texture2D(u_Shadows[i], shadowCoord.xy).r + 0.005)) ? 0.7:1.0;
-				vec3 shadowCoord = (v_PositionFromLight[i].xyz / v_PositionFromLight[i].w) / 2.0 + 0.5;
-				if(shadowCoord.x < 0.0 || shadowCoord.x > 1.0 || shadowCoord.y < 0.0 || shadowCoord.y > 1.0){
-					visibility = 1.0;
-				}else{
-					vec4 rgbaDepth = texture2D(u_Shadows[i], shadowCoord.xy);
-					float depth = rgbaDepth.r; // Retrieve the z value from R
-					visibility = (shadowCoord.z > depth + 0.005) ? 0.7:1.0;
+				vec3 shadowCoord = (v_PositionFromLight[i].xyz / v_PositionFromLight[i].w);
+				//if(shadowCoord.x < 0.0 || shadowCoord.x > 1.0 || shadowCoord.y < 0.0 || shadowCoord.y > 1.0){
+				//	visibility = 1.0;
+				//}else{
+				float depth;
+				if(u_Lights[i].type == 1){
+					depth = directionalLightDepth(u_Shadows, shadowCoord); // Retrieve the z value from R
+				}else if(u_Lights[i].type == 2){
+					depth = pointLightDepth(u_ShadowsCube, shadowCoord);
 				}
+				visibility = (shadowCoord.z > depth + 0.005) ? 0.7:1.0;
+
 			}
 
 			if(u_Lights[i].type == 1){
