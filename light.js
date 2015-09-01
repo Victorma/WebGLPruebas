@@ -48,6 +48,8 @@ Light.prototype.onCreate = function(){
     this.color = new Vector3([0.0, 0.0, 0.0]);
     this.range = 1;
     this.casts = 0;
+    this.near = 0.05;
+    this.far = 100.0;
 
     this.bias = new Matrix4({
         elements : [0.5, 0.0, 0.0, 0.0,
@@ -106,6 +108,10 @@ Light.prototype.onPreRender = function(scene, shader){
     if(this.needToRecalculate){
         this.needToRecalculate = false;
 
+        delete this.matrix;
+        delete this.projection;
+        delete this.view;
+
         this.projection = new Matrix4();
         this.view = new Matrix4();
         this.projection.setIdentity();
@@ -117,12 +123,17 @@ Light.prototype.onPreRender = function(scene, shader){
                 this.direction.elements[1]*3,
                 this.direction.elements[2]*3,
                 0,0,0,0,1,0);
-            this.projection.setOrtho(-10, 10, -10, 10, 0.01 , 100);
+            this.projection.setOrtho(-10, 10, -10, 10, this.near, this.far);
+            if(this.framebuffer == null)
+                this.framebuffer = initFramebufferObject(this.gl)[0];
 
-            this.framebuffer = initFramebufferObject(this.gl)[0];
             this.matrix = new Matrix4(this.bias).multiply(new Matrix4(this.projection).multiply(new Matrix4(this.view)));
 
         }else if(this.type == 2 || this.type == 3){
+
+            if(this.framebuffer == null)
+                this.framebuffer = initFramebufferObject(this.gl, this.gl.TEXTURE_CUBE_MAP);
+
             var position = new Vector4([0.0, 0.0, 0.0, 1.0]);
             position = scene.peekMatrix().multiplyVector4(position);
 
@@ -139,12 +150,12 @@ Light.prototype.onPreRender = function(scene, shader){
                 new Vector3([0,0,-1])];// -Z
 
             this.upDirections = [
-                new Vector3([ 0,1,0]), //  X
-                new Vector3([ 0,1,0]), // -X
-                new Vector3([-1,0,0]), //  Y
-                new Vector3([ 1,0,0]), // -Y
-                new Vector3([ 0,1,0]), //  Z
-                new Vector3([ 0,1,0])];// -Z
+                new Vector3([0,-1,0]), //  X
+                new Vector3([0,-1,0]), // -X
+                new Vector3([0,0, 1]), //  Y
+                new Vector3([0,0,-1]), // -Y
+                new Vector3([0,-1,0]), //  Z
+                new Vector3([0,-1,0])];// -Z
 
             for(var i = 0; i<6; i++) {
                 this.view[i] = new Matrix4();
@@ -154,9 +165,10 @@ Light.prototype.onPreRender = function(scene, shader){
                 this.view[i].setLookAt(p[0], p[1], p[2], p[0]+fd[0], p[1]+fd[1], p[2]+fd[2],ud[0],ud[1],ud[2]);
             }
 
-            this.projection.setPerspective(90, OFFSCREEN_WIDTH/OFFSCREEN_HEIGHT, 1, 100);
-            this.framebuffer = initFramebufferObject(this.gl, this.gl.TEXTURE_CUBE_MAP);
-            this.matrix = /*new Matrix4(this.bias).multiply*/(new Matrix4(this.projection).multiply(new Matrix4(this.view[0])));
+            this.projection.setPerspective(90, OFFSCREEN_WIDTH/OFFSCREEN_HEIGHT, this.near, this.far);
+
+
+            this.matrix = new Matrix4(this.bias).multiply(new Matrix4(this.projection).multiply(new Matrix4(this.view[4])));
         }
 
 
@@ -180,7 +192,7 @@ Light.prototype.onPreRender = function(scene, shader){
 
             scene.do("onRender", this.program);
 
-            putImage(this.gl, "img"+(this.number));
+            //putImage(this.gl, "img"+(this.number));
         }else if(this.type == 2){
             this.gl.uniformMatrix4fv(this.program.u_ProjMatrix, false, this.projection.elements);
             // Render 6 times for cubemap
@@ -223,6 +235,9 @@ Light.prototype.onPreRender = function(scene, shader){
         this.gl.uniform3fv(this.program.u_Lights[this.number].color, this.color.elements);
         this.gl.uniform1f(this.program.u_Lights[this.number].range, this.range);
         this.gl.uniform1i(this.program.u_Lights[this.number].casts, this.casts);
+
+        this.gl.uniform1f(this.program.u_Lights[this.number].near, this.near);
+        this.gl.uniform1f(this.program.u_Lights[this.number].far, this.far);
 
         this.gl.activeTexture(glTextureIndex(this.gl, this.number));
         if(this.type == 1){
