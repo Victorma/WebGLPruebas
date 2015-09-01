@@ -63,6 +63,7 @@ function initFramebufferObject(gl, textureType) {
 	gl.texParameteri(textureType, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 	gl.texParameteri(textureType, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 	gl.texParameteri(textureType, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+	//gl.texParameteri(textureType, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
 
 	for(var face = 0; face<faceDef.length; face++) {
 		gl.texImage2D(faceDef[face], 0, gl.RGBA, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);

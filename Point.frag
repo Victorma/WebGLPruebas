@@ -20,6 +20,9 @@ struct Light {
 	// Range (<0 means unlimited)
 	float range; // TODO RANGE ATTENUATION
 
+	float near;
+	float far;
+
 	// ShadowCast
 	int casts;
 
@@ -54,6 +57,18 @@ float directionalLightDepth(sampler2D sampler, vec3 coord){
 	return unpack(texture2D(sampler, coord.xy));
 }
 
+// Thanks to  Benlitz & Andon M. Coleman, I really really thank this to you after days of failing constantly.
+// (http://stackoverflow.com/questions/10786951/omnidirectional-shadow-mapping-with-depth-cubemap)
+float VectorToDepth (vec3 Vec, Light light){
+    vec3 AbsVec = abs(Vec);
+    float LocalZcomp = max(AbsVec.x, max(AbsVec.y, AbsVec.z)),
+    	n = light.near,
+    	f = light.far;
+
+    float NormZComp = (f+n) / (f-n) - (2.0*f*n)/(f-n)/LocalZcomp;
+    return (NormZComp + 1.0) * 0.5;
+}
+
 void main() {
 
 	// Point light
@@ -79,23 +94,24 @@ void main() {
 				if(u_Lights[i].type == 1){
 					depth = directionalLightDepth(u_Shadows, shadowCoord); // Retrieve the z value from R
 				}else if(u_Lights[i].type == 2){
-					depth = pointLightDepth(u_ShadowsCube, shadowCoord);
+					vec3 LightVector = (v_Position.xyz/v_Position.w) - u_Lights[i].position;
+					shadowCoord.z = VectorToDepth(LightVector,u_Lights[i]);
+					depth = pointLightDepth(u_ShadowsCube, normalize(LightVector));
 				}
 				visibility = (shadowCoord.z > depth + 0.005) ? 0.7:1.0;
-
 			}
 
 			if(u_Lights[i].type == 1){
 				// Directional light
 				float nDirL = max(dot(u_Lights[i].direction, v_Normal), 0.0);
-				nDirL = floor(nDirL*numLayers)*factor;
+				//nDirL = floor(nDirL*numLayers)*factor;
 				point += (u_Lights[i].color * vec3(v_Color) * nDirL) * visibility;
 
 			}else if(u_Lights[i].type == 2){
 				// Point light
 				vec3 lightDirection = normalize(u_Lights[i].position - vec3(v_Position));
 				float nDotL = max(dot(lightDirection, normalize(v_Normal)), 0.0);
-				nDotL = floor(nDotL*numLayers)*factor;
+				//nDotL = floor(nDotL*numLayers)*factor;
 				if(nDotL == 0.0)
 					nDotL = factor*0.5;
 				point += (u_Lights[i].color * vec3(v_Color) * nDotL) * visibility;

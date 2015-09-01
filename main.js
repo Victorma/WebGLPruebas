@@ -4,7 +4,7 @@ var VSHADER_SOURCE = null;
 var FSHADER_SOURCE = null;
 
 var OFFSCREEN_WIDTH = 1024, OFFSCREEN_HEIGHT = 1024;
-var LIGHT_X = 0, LIGHT_Y = 1, LIGHT_Z = 0;
+var LIGHT_X = 0, LIGHT_Y = 1.5, LIGHT_Z = -0.5;
 
 var canvas = null;
 var img = null;
@@ -73,6 +73,8 @@ function main() {
 			lightProgram.u_Lights[i].casts = gl.getUniformLocation(lightProgram, 'u_Lights[' + i + '].casts');
 			lightProgram.u_Lights[i].shadows = gl.getUniformLocation(lightProgram, 'u_Shadows');
 			lightProgram.u_Lights[i].shadowsCube = gl.getUniformLocation(lightProgram, 'u_ShadowsCube');
+			lightProgram.u_Lights[i].near = gl.getUniformLocation(lightProgram, 'u_Lights[' + i + '].near');
+			lightProgram.u_Lights[i].far = gl.getUniformLocation(lightProgram, 'u_Lights[' + i + '].far');
 			lightProgram.u_Lights[i].matrix = gl.getUniformLocation(lightProgram, 'u_Lights[' + i + '].matrix');
 		}
 		lightProgram.u_NumLights = gl.getUniformLocation(lightProgram, 'u_NumLights');
@@ -120,7 +122,7 @@ function start(gl) {
 	 */
 
 	camera = new Matrix4();
-	camera.setLookAt(3,3,7,0,0,0,0,1,0);
+	camera.setLookAt(-3,13,-13,0,0,0,0,1,0);
 	//camera.setLookAt(LIGHT_X,LIGHT_Y,LIGHT_Z,0,0,0,0,1,0);
 
 	projection = new Matrix4();
@@ -160,7 +162,7 @@ function start(gl) {
 		directionalLight.direction.elements[1],
 		directionalLight.direction.elements[2]);
 	directionalLight.color = new Vector3([0.1, 0.1, 0.1]);
-	directionalLight.casts = 1;
+	directionalLight.casts = 0;
 	directionalLightObject.addComponent(directionalLight);
 	directionalLight.onParametersChanged();
 	scene.addObject(directionalLightObject);
@@ -181,9 +183,26 @@ function start(gl) {
 	cube = createCube(gl, lightProgram);
 	cube.setTranslate(0.0, 0, 0.0);
 	scene.addObject(cube);
+	// Cube
+	var cube2 = createCube(gl, lightProgram);
+	cube2.setTranslate(3.0, 1, 0.0);
+	cube2.scale(0.3,0.3,0.3);
+	scene.addObject(cube2);
+	// Cube
+	var cube3 = createCube(gl, lightProgram);
+	cube3.setTranslate(1.0, 0, 0.0);
+	cube3.scale(0.3,0.3,0.3);
+
+	scene.addObject(cube3);
+	// Cube
+	var cube4 = createCube(gl, lightProgram);
+	cube4.setTranslate(0.0, 0, 1.0)
+	cube4.scale(0.3,0.3,0.3);
+	cube4.scale(1.5,1.5,1.5);
+	scene.addObject(cube4);
 	// Plane
 	plane = createPlane(gl, lightProgram);
-	plane.setTranslate(0.0,-0.5,0.0);
+	plane.setTranslate(-1,-1,0.0);
 	plane.scale(10.0,1.0,10.0);
 	scene.addObject(plane);
 
@@ -204,6 +223,7 @@ function start(gl) {
  */
 
 var cubeBackup = new Matrix4();
+var ang = 0 ;
 
 function draw(gl) {
 
@@ -213,6 +233,11 @@ function draw(gl) {
 	cube.rotate(currentAngle[0], 1.0, 0.0, 0.0); // x-axis
 	cube.rotate(currentAngle[1], 0.0, 1.0, 0.0); // y-axis*/
 	cube.scale(0.3,0.3,0.3);
+
+	ang+=0.01;
+
+	positionalLightObject.setTranslate(Math.cos(ang)* 1.5, Math.sin(ang) * 1.5, 0);
+	positionalLight.onParametersChanged();
 
 	scene.draw();
 

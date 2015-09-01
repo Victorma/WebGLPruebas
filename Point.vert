@@ -23,11 +23,14 @@ struct Light {
 	vec3 color;
 
 	// Range (<0 means unlimited)
-	float range;
+	float range; // TODO RANGE ATTENUATION
+
+	float near;
+	float far;
 
 	// ShadowCast
 	int casts;
-	//sampler2D shadows;
+
 	mat4 matrix;
 };
 
