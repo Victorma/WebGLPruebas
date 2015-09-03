@@ -15,19 +15,38 @@ var Scene = function(gl, lightProgram, shadowProgram) {
     this.identity = new Matrix4();
     this.identity.setIdentity();
     this.matrixStack.push(this.identity);
+
+    this.framebuffer = null;
 };
 
 /**
  * On Create called just in creation time
  */
 Scene.prototype.draw = function(){
-    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
-    this.gl.viewport(0, 0, canvas.width, canvas.height);
-    this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+
+    // Prerender things
     this.do("onPreRender");
     this.do("onPreRender", lightProgram);
+
+    // Render things
+    var width = canvas.width,
+        height = canvas.height;
+
+    if(this.framebuffer != null){
+        width = this.framebuffer.width;
+        height = this.framebuffer.height;
+    }
+
+    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebuffer);
+    this.gl.viewport(0, 0, width, height);
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+
     this.do("onRender");
+
+    // PostRender things
     this.do("onPostRender");
+
+    //putImage(gl, "img0", width, height);
 };
 
 Scene.prototype.do = function(call, shader){
@@ -39,11 +58,6 @@ Scene.prototype.do = function(call, shader){
         this.rootObject.onSomething(call, this, shader);
     }else{
         // If no shader, lets clear the main buffer
-        if(call == "onRender") {
-            this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
-            this.gl.viewport(0, 0, canvas.width, canvas.height);
-            this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
-        }
         this.rootObject.onSomething(call, this);
     }
 
@@ -84,4 +98,8 @@ Scene.prototype.popMatrix = function(){
 
 Scene.prototype.peekMatrix = function(){
     return this.matrixStack[this.matrixStack.length-1];
+};
+
+Scene.prototype.renderTo = function(framebuffer){
+    this.framebuffer = framebuffer;
 };
