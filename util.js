@@ -25,7 +25,7 @@ function enableBuffer(gl, buffer, attribute){
 	}
 };
 
-function initFramebufferObject(gl, textureType) {
+function initFramebufferObject(gl, width, height, textureType) {
 	var framebuffer = [], texture, depthBuffer;
 
 	/*
@@ -66,16 +66,19 @@ function initFramebufferObject(gl, textureType) {
 	//gl.texParameteri(textureType, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
 
 	for(var face = 0; face<faceDef.length; face++) {
-		gl.texImage2D(faceDef[face], 0, gl.RGBA, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+		gl.texImage2D(faceDef[face], 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 
 		// Create a framebuffer object (FBO)
 		framebuffer[face] = gl.createFramebuffer();
 		framebuffer[face].texture = texture; // Store the texture object
 
+		framebuffer[face].width = width;
+		framebuffer[face].height = height;
+
 		// Create a renderbuffer object and set its size and parameters
 		depthBuffer = gl.createRenderbuffer(); // Create a renderbuffer
 		gl.bindRenderbuffer(gl.RENDERBUFFER, depthBuffer);
-		gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT);
+		gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
 
 		// Attach the texture and the renderbuffer object to the FBO
 		gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer[face]);
@@ -149,4 +152,80 @@ function glTextureIndex(gl, index){
 	}
 
 	return undefined;
+}
+
+function addOption(label,text,object){
+	var child = document.createElement("option");
+	child.value = label;
+	child.text = text.split(".")[0].replace("_", " ");
+	object.appendChild(child);
+}
+
+var shaderDir = "shaders/program/";
+
+function readShaderFiles(selectObject){
+	var request = new XMLHttpRequest();
+	request.onreadystatechange = function() {
+		if (request.readyState === 4 && request.status !== 404){
+			var names = request.responseText.split("\n");
+			addOption("-1", "Ninguno", selectObject);
+			for(var n in names){
+				addOption(names[n], names[n].split(".")[0].replace("_", " "), selectObject);
+			}
+		}
+	}
+	request.open('GET', shaderDir + "names.txt", true);
+	request.send(); // Send the request
+}
+
+var shaders = [];
+var shaderFiles = [];
+var currentShader = null;
+
+function onShaderChanged(select){
+	var shader = select.value;
+	if(shader == "-1"){
+		currentShader = null;
+	}else{
+		loadPostShader(shader);
+	}
+}
+
+function loadPostShader(shaderName){
+	if(shaders[shaderName] === undefined){
+		var request = new XMLHttpRequest();
+		request.onreadystatechange = function() {
+			if (request.readyState === 4 && request.status !== 404){
+				shaders[shaderName] = JSON.parse(request.responseText);
+				var s = shaders[shaderName];
+				createProgramFiles(getGL(),
+					shaderDir + s.vertex+".vsh",
+					shaderDir + s.fragment+".fsh",
+					function(program){
+						s.program = program;
+						switchProgram(gl,s.program);
+						for(var u in s.uniforms){
+							var uniform = s.uniforms[u];
+							s.program["u_"+uniform.name] = gl.getUniformLocation(s.program, uniform.name);
+						}
+
+						for(var sa in s.samplers){
+							var sampler = s.samplers[sa];
+							s.program["u_"+sampler] = gl.getUniformLocation(s.program, sampler);
+						}
+
+						for(var a in s.attributes){
+							var attribute = s.attributes[a];
+							s.program["a_"+attribute] = gl.getAttribLocation(s.program, attribute);
+						}
+
+						currentShader = s;
+					}
+				);
+			}
+		};
+		request.open('GET', shaderDir + shaderName, true);
+		request.send(); // Send the request
+	}else
+		currentShader = shaders[shaderName];
 }

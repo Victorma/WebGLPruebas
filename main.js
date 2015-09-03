@@ -8,6 +8,7 @@ var LIGHT_X = 0, LIGHT_Y = 1.5, LIGHT_Z = -0.5;
 
 var canvas = null;
 var img = null;
+var gl;
 
 var camera = new Matrix4();
 var lightCamera = new Matrix4();
@@ -19,9 +20,11 @@ var shadowProgram;
 function main() {
 	// Retrieve <canvas> element
 	canvas = document.getElementById('webgl');
+	shaders = document.getElementById('shaders');
+	readShaderFiles(shaders);
 
 	// Get the rendering context for WebGL
-	var gl = getWebGLContext(canvas);
+	gl = getWebGLContext(canvas);
 	if (!gl) {
 		console.log('Failed to get the rendering context for WebGL');
 		return;
@@ -173,7 +176,7 @@ function start(gl) {
 	positionalLight.type = 2;
 	positionalLightObject.setTranslate(LIGHT_X, LIGHT_Y, LIGHT_Z);
 	positionalLight.color = new Vector3([0.8, 0.4, 0.4]);
-	positionalLight.casts = 1;
+	positionalLight.casts = 0;
 	positionalLightObject.addComponent(positionalLight);
 	positionalLight.onParametersChanged();
 	scene.addObject(positionalLightObject);
@@ -210,20 +213,61 @@ function start(gl) {
 	currentAngle = [0.0, 0.0]; // [x-axis, y-axis] degrees
 	initEventHandlers(canvas, currentAngle);
 
+	lastFramebuffer = initFramebufferObject(gl, canvas.width, canvas.height)[0];
+	currentFramebuffer = initFramebufferObject(gl, canvas.width, canvas.height)[0];
+
+	/*var postRenderVertices = new Float32Array([
+		-1.0, -1.0, 0.0,  1.0, -1.0, 0.0,  -1.0, 1.0, 0.0,  1.0, 1.0, 0.0
+	]);*/
+
+	var postRenderVertices = new Float32Array([
+		0.0, 0.0, 0.0,  1.0, 0.0, 0.0,  0.0, 1.0, 0.0,  1.0, 1.0, 0.0
+	]);
+
+	var postRenderColors = new Float32Array([ // Vertex coordinates
+		1.0, 1.0, 1.0, 1.0,	 1.0, 1.0, 1.0, 1.0,	1.0, 1.0, 1.0, 1.0, 	1.0, 1.0, 1.0, 1.0
+	]);
+
+	var postRenderUVs = new Float32Array([ // Vertex coordinates
+		0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0
+	]);
+
+	var postRenderIndexes = new Uint8Array([
+		0, 1, 3, 0, 3, 2 // down
+	]);
+
+	var postRenderObject = new SceneObject(gl,lightProgram);
+	var postRenderRenderer = new Renderer(gl, lightProgram);
+	postRenderRenderer.vertices = postRenderVertices;
+	postRenderRenderer.colors = postRenderColors;
+	postRenderRenderer.uvs = postRenderUVs;
+	postRenderRenderer.triangles = postRenderIndexes;
+	postRenderRenderer.onChangePoints();
+	postRenderObject.addComponent(postRenderRenderer);
+
+	postRenderScene = new Scene(gl,lightProgram, shadowProgram);
+	postRenderScene.addObject(postRenderObject);
+
+
+
 	var tick = function() {
 		draw(gl);
 		requestAnimationFrame(tick);// Request that the browser calls tick
 	};
 	tick();
 
-}
 
+}
+var postRenderScene;
 /**
  * Main draw method
  */
 
 var cubeBackup = new Matrix4();
 var ang = 0 ;
+
+var lastFramebuffer;
+var currentFramebuffer;
 
 function draw(gl) {
 
@@ -234,12 +278,72 @@ function draw(gl) {
 	cube.rotate(currentAngle[1], 0.0, 1.0, 0.0); // y-axis*/
 	cube.scale(0.3,0.3,0.3);
 
-	ang+=0.01;
+	ang+=0.02;
 
 	positionalLightObject.setTranslate(Math.cos(ang)* 1.5, Math.sin(ang) * 1.5, 0);
 	positionalLight.onParametersChanged();
 
+	if(currentShader == null)
+		scene.renderTo(null);
+	else
+		scene.renderTo(currentFramebuffer);
+
 	scene.draw();
+
+	if(currentShader != null) {
+
+		this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+		this.gl.viewport(0, 0, canvas.width, canvas.height);
+		this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+
+		switchProgram(gl,currentShader.program);
+
+		for(var u in currentShader.uniforms){
+			var uni = currentShader.uniforms[u];
+
+			switch(uni.type){
+				case "matrix4x4":
+					gl.uniformMatrix4fv(currentShader.program["u_"+uni.name], false, uni.values);
+					break;
+				case "float":
+					gl["uniform"+ uni.count + "fv"](currentShader.program["u_"+uni.name],uni.values);
+					break;
+			}
+		}
+
+		this.gl.activeTexture(glTextureIndex(this.gl, 0));
+		this.gl.bindTexture(this.gl.TEXTURE_2D, currentFramebuffer.texture);
+		this.gl.uniform1i(currentShader.program.u_DiffuseSampler, 0);
+
+		if(currentShader.program.u_PrevSampler !== undefined){
+			this.gl.activeTexture(glTextureIndex(this.gl, 1));
+			this.gl.bindTexture(this.gl.TEXTURE_2D, lastFramebuffer.texture);
+			this.gl.uniform1i(currentShader.program.u_PrevSampler, 1);
+		}
+
+
+
+		this.bias = new Matrix4();
+		this.bias.setIdentity();
+		this.bias.setScale(2.0, 2.0, 1.0);
+		this.bias.translate(-0.5,-0.5,0.0);
+
+		if(currentShader.program.u_ProjMat !== undefined)
+			gl.uniformMatrix4fv(currentShader.program.u_ProjMat, false, this.bias.elements);
+
+		if(currentShader.program.u_InSize !== undefined)
+			gl.uniform2f(currentShader.program.u_InSize , currentFramebuffer.width, currentFramebuffer.height);
+
+		if(currentShader.program.u_OutSize !== undefined)
+			gl.uniform2f(currentShader.program.u_OutSize , 1.0, 1.0);
+
+		postRenderScene.do("onRender", currentShader.program);
+	}
+
+	// Exchange frames
+	var aux = currentFramebuffer;
+	currentFramebuffer = lastFramebuffer;
+	lastFramebuffer = aux;
 
 	// RESTORE MATRIX
 	cube.matrix.set(cubeBackup);
@@ -249,4 +353,8 @@ function draw(gl) {
 function switchProgram(gl, program){
 	gl.useProgram(program);
 	gl.program = program;
+}
+
+function getGL(){
+	return gl;
 }

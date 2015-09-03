@@ -79,19 +79,19 @@ Light.prototype.onChangeProgram = function(){
     switchProgram(this.gl, this.program);
 };
 
-function putImage(gl, destination){
+function putImage(gl, destination, width, height){
 
-    var data = new Uint8Array(OFFSCREEN_WIDTH * OFFSCREEN_HEIGHT * 4);
-    gl.readPixels(0, 0, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT, gl.RGBA, gl.UNSIGNED_BYTE, data);
+    var data = new Uint8Array(width * height * 4);
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, data);
 
     // Create a 2D canvas to store the result
     var canvas = document.createElement('canvas');
-    canvas.width = OFFSCREEN_WIDTH;
-    canvas.height = OFFSCREEN_HEIGHT;
+    canvas.width = width;
+    canvas.height = height;
     var context = canvas.getContext('2d');
 
     // Copy the pixels to a 2D canvas
-    var imageData = context.createImageData(OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT);
+    var imageData = context.createImageData(width, height);
     imageData.data.set(data);
     context.putImageData(imageData, 0, 0);
 
@@ -125,14 +125,14 @@ Light.prototype.onPreRender = function(scene, shader){
                 0,0,0,0,1,0);
             this.projection.setOrtho(-10, 10, -10, 10, this.near, this.far);
             if(this.framebuffer == null)
-                this.framebuffer = initFramebufferObject(this.gl)[0];
+                this.framebuffer = initFramebufferObject(this.gl, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT)[0];
 
             this.matrix = new Matrix4(this.bias).multiply(new Matrix4(this.projection).multiply(new Matrix4(this.view)));
 
         }else if(this.type == 2 || this.type == 3){
 
             if(this.framebuffer == null)
-                this.framebuffer = initFramebufferObject(this.gl, this.gl.TEXTURE_CUBE_MAP);
+                this.framebuffer = initFramebufferObject(this.gl, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT, this.gl.TEXTURE_CUBE_MAP);
 
             var position = new Vector4([0.0, 0.0, 0.0, 1.0]);
             position = scene.peekMatrix().multiplyVector4(position);
@@ -183,7 +183,7 @@ Light.prototype.onPreRender = function(scene, shader){
 
         if(this.type == 1){
             this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebuffer);
-            this.gl.viewport(0, 0, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT);
+            this.gl.viewport(0, 0, this.framebuffer.width, this.framebuffer.height);
             this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
 
@@ -192,19 +192,26 @@ Light.prototype.onPreRender = function(scene, shader){
 
             scene.do("onRender", this.program);
 
+            this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+            this.gl.viewport(0, 0, canvas.width, canvas.height);
+
             //putImage(this.gl, "img"+(this.number));
         }else if(this.type == 2){
             this.gl.uniformMatrix4fv(this.program.u_ProjMatrix, false, this.projection.elements);
             // Render 6 times for cubemap
             for(var i = 0; i<6; i++){
                 this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebuffer[i]);
-                this.gl.viewport(0, 0, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT);
+                this.gl.viewport(0, 0, this.framebuffer[i].width, this.framebuffer[i].height);
                 this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
                 this.gl.uniformMatrix4fv(this.program.u_ViewMatrix, false, this.view[i].elements);
                 scene.do("onRender", this.program);
+
                 //putImage(this.gl, "img"+(this.number+i));
             }
+
+            this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+            this.gl.viewport(0, 0, canvas.width, canvas.height);
         }
 
         //
