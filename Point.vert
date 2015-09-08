@@ -52,12 +52,16 @@ varying vec3 v_Normal;
 varying vec4 v_Position;
 varying vec4 v_Color;
 varying vec4 v_Uv;
+varying vec3 v_EyeDirection;
 
 
 
 void main() {
 	// Vertex position
 	v_Position = u_ModelMatrix * a_Position;
+	// Aux view vertex position
+	vec3 EyePosition = (-u_ViewMatrix[3].xyz * mat3(u_ViewMatrix));
+    v_EyeDirection = EyePosition - v_Position.xyz;
 	// Final vertex rendering position (After view and projection transformations)
 	gl_Position = u_ProjMatrix * u_ViewMatrix * v_Position;
 

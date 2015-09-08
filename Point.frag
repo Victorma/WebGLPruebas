@@ -37,6 +37,8 @@ uniform samplerCube u_ShadowsCube;
 varying vec3 ambient;
 varying vec4 v_PositionFromLight[MAX_LIGHTS];
 
+varying vec3 v_EyeDirection;
+
 varying vec3 v_Normal;
 varying vec4 v_Position;
 varying vec4 v_Color;
@@ -55,6 +57,24 @@ float pointLightDepth(samplerCube sampler, vec3 direction){
 
 float directionalLightDepth(sampler2D sampler, vec3 coord){
 	return unpack(texture2D(sampler, coord.xy));
+}
+
+vec3 diffuse(Light light){
+	vec3 dir = light.direction;
+	if(light.type == 2)
+		dir = normalize(light.position - vec3(v_Position));
+
+	float cosTheta = max(dot(dir, normalize(v_Normal)), 0.0);
+	return light.color * vec3(v_Color) * cosTheta;
+}
+
+vec3 specular(Light light){
+	vec3 dir = light.direction;
+	if(light.type == 2)
+		dir = normalize(light.position - vec3(v_Position));
+
+	float cosAlpha = clamp(dot(normalize(v_EyeDirection), reflect(-dir,v_Normal)), 0.0, 1.0);
+	return light.color * vec3(v_Color) * pow(cosAlpha,5.0);
 }
 
 // Thanks to  Benlitz & Andon M. Coleman, I really really thank this to you after days of failing constantly.
@@ -83,13 +103,9 @@ void main() {
 			//if(i >= u_NumPositionalLights) break;
 
 			if(u_Lights[i].casts == 1){
-				//vec3 shadowCoord = (v_PositionFromLight[i].xyz / v_PositionFromLight[i].w) / 2.0 + 0.5;
 				// Visibility calc
-				//visibility = (shadowCoord.z > (texture2D(u_Shadows[i], shadowCoord.xy).r + 0.005)) ? 0.7:1.0;
 				vec3 shadowCoord = (v_PositionFromLight[i].xyz / v_PositionFromLight[i].w);
-				//if(shadowCoord.x < 0.0 || shadowCoord.x > 1.0 || shadowCoord.y < 0.0 || shadowCoord.y > 1.0){
-				//	visibility = 1.0;
-				//}else{
+
 				float depth;
 				if(u_Lights[i].type == 1){
 					depth = directionalLightDepth(u_Shadows, shadowCoord); // Retrieve the z value from R
@@ -101,9 +117,11 @@ void main() {
 				visibility = (shadowCoord.z > depth + 0.005) ? 0.7:1.0;
 			}
 
-			if(u_Lights[i].type == 1){
+			/*if(u_Lights[i].type == 1){
 				// Directional light
 				float nDirL = max(dot(u_Lights[i].direction, v_Normal), 0.0);
+
+				// Toon shader things
 				//nDirL = floor(nDirL*numLayers)*factor;
 				point += (u_Lights[i].color * vec3(v_Color) * nDirL) * visibility;
 
@@ -111,11 +129,14 @@ void main() {
 				// Point light
 				vec3 lightDirection = normalize(u_Lights[i].position - vec3(v_Position));
 				float nDotL = max(dot(lightDirection, normalize(v_Normal)), 0.0);
+				// Toon shader things
 				//nDotL = floor(nDotL*numLayers)*factor;
 				if(nDotL == 0.0)
 					nDotL = factor*0.5;
 				point += (u_Lights[i].color * vec3(v_Color) * nDotL) * visibility;
-			}
+			}*/
+
+			point += (diffuse(u_Lights[i]) + specular(u_Lights[i])) * visibility;
 		}
 	}
 
