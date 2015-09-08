@@ -10,10 +10,6 @@ var canvas = null;
 var img = null;
 var gl;
 
-var camera = new Matrix4();
-var lightCamera = new Matrix4();
-var projection = new Matrix4();
-
 var lightProgram;
 var shadowProgram;
 
@@ -113,7 +109,9 @@ var u_ModelMatrix;
 var u_ViewMatrix;
 var u_ProjMatrix;
 
-function start(gl) {
+function start(gl){
+
+	Camera.init();
 
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
 	gl.enable(gl.DEPTH_TEST);
@@ -126,10 +124,12 @@ function start(gl) {
 
 	camera = new Matrix4();
 	camera.setLookAt(-3,13,-13,0,0,0,0,1,0);
+	Camera.main.configureView(new Vector3([-3,13,-13]), new Vector3([0,0,0]));
 	//camera.setLookAt(LIGHT_X,LIGHT_Y,LIGHT_Z,0,0,0,0,1,0);
 
 	projection = new Matrix4();
 	projection.setPerspective(30, canvas.width/canvas.height, 1,100);
+	Camera.main.configureProjection(false, canvas.width,canvas.height, 1, 100, 30);
 
 	var identity = new Matrix4();
 	identity.setIdentity();

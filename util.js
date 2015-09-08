@@ -228,4 +228,53 @@ function loadPostShader(shaderName){
 		request.send(); // Send the request
 	}else
 		currentShader = shaders[shaderName];
-}
+};
+
+function negative(v){
+	var e = v.elements;
+	return new Vector3([-e[0], -e[1], -e[2]]);
+};
+
+function sum(u,v){
+	var eu = u.elements, ev = v.elements;
+
+	var wx = eu[0] + ev[0],
+		wy = eu[1] + ev[1],
+		wz = eu[2] + ev[2];
+
+	return new Vector3([wx,wy,wz]);
+};
+
+function dif(u,v){
+	return sum(u,negative(v));
+};
+
+function normalize(v){
+	var len = length(v), e = v.elements;
+	return div(v,len);
+};
+
+function div(v,f){
+	return mult(v,1/f);
+};
+
+function mult(v,f){
+	var e = v.elements;
+	var vx = e[0]*f,
+		vy = e[1]*f,
+		vz = e[2]*f;
+
+	return new Vector3([vx,vy,vz]);
+};
+
+function length(v){
+	var e = v.elements;
+	return Math.sqrt(e[0] * e[0] + e[1] * e[1] + e[2] * e[2]);
+};
+
+function vect(u,v){
+	var eu = u.elements,
+		ev = v.elements;
+
+	return productoEscalar(eu,ev);
+};
