@@ -295,8 +295,8 @@ Light.prototype.onPostRender = function(scene, shader){
             this.gl.vertexAttrib4f(this.lightPointShader.a_Position, 0.0, 0.0, 0.0, 1.0);
             this.gl.uniform3fv(this.lightPointShader.u_Color, this.color.elements);
             this.gl.uniformMatrix4fv(this.lightPointShader.u_ModelMatrix, false, scene.peekMatrix().elements);
-            this.gl.uniformMatrix4fv(this.lightPointShader.u_ViewMatrix, false, camera.elements);
-            this.gl.uniformMatrix4fv(this.lightPointShader.u_ProjMatrix, false, projection.elements);
+            this.gl.uniformMatrix4fv(this.lightPointShader.u_ViewMatrix, false, Camera.main.view.elements);
+            this.gl.uniformMatrix4fv(this.lightPointShader.u_ProjMatrix, false, Camera.main.projection.elements);
 
             this.gl.depthMask(false);
 

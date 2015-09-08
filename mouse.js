@@ -1,3 +1,13 @@
+var Controller = function() {};
+
+Controller.w = false;
+Controller.a = false;
+Controller.s = false;
+Controller.d = false;
+Controller.shift = false;
+Controller.space = false;
+
+
 function initEventHandlers(canvas, currentAngle) {
 	
 	var dragging = false; // Dragging or not
@@ -11,6 +21,10 @@ function initEventHandlers(canvas, currentAngle) {
 			lastX = x; lastY = y;
 			dragging = true;
 		}
+	};
+
+	canvas.oncontextmenu = function (e) {
+		e.preventDefault();
 	};
 	
 	// Mouse is released
@@ -28,4 +42,27 @@ function initEventHandlers(canvas, currentAngle) {
 		}
 		lastX = x, lastY = y;
 	};
+	canvas.tabIndex = 1000;
+
+	canvas.addEventListener("keydown" , function (ev) {
+		// w = 87 a = 65 s = 83 d = 68
+		switch(ev.keyCode){
+			case 87: Controller.w = true; break;
+			case 65: Controller.a = true; break;
+			case 83: Controller.s = true; break;
+			case 68: Controller.d = true; break;
+			case 32: Controller.space = true; break;
+			case 16: Controller.shift = true; break;
+		}
+	},false);
+	canvas.addEventListener("keyup" , function (ev) {
+		switch(ev.keyCode){
+			case 87: Controller.w = false; break;
+			case 65: Controller.a = false; break;
+			case 83: Controller.s = false; break;
+			case 68: Controller.d = false; break;
+			case 32: Controller.space = false; break;
+			case 16: Controller.shift = false; break;
+		}
+	},false);
 };

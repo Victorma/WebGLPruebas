@@ -53,17 +53,6 @@ Camera.prototype.configureView = function(position, look, opt_up){
             // Ahora tengo un vector, que apoyado en (0,y,0) me lleva al punto de up.
             opt_up = sum(new Vector3([0,y,0]),vxz);
 
-            /*var d = y / de[1];
-
-            var n = mult(lookDir, d);
-            var vn = normalize(dif(n, new Vector3([0,y,0])));
-
-            var a = 1;
-            var b = vn.elements[0] + vn.elements[2];
-            var c = d*d + y*y + n.elements[0] + n.elements[2];
-
-            var s = solveCuadraticEcuation(a,b,c);
-            var h = s[0]>0 ? s[0] : s[1];*/
         }
     }
 
@@ -75,6 +64,7 @@ Camera.prototype.configureView = function(position, look, opt_up){
     this.look = new Vector3(l);
     this.up = new Vector3(u);
 
+    this.generateUVN();
 
     this.view.setLookAt(p[0], p[1], p[2], l[0], l[1], l[2], u[0], u[1], u[2]);
     this.pv = new Matrix4(this.projection).multiply(new Matrix4(this.view));
@@ -87,6 +77,30 @@ Camera.prototype.configureViewCoords = function(px, py, pz, lx, ly, lz, ux, uy, 
         up = new Vector3([ux,uy,uz]);
 
     this.configureView(position, look, up);
+};
+
+Camera.prototype.generateUVN = function(){
+    this.n = normalize(dif(this.position, this.look));
+    this.u = normalize(vect(this.up, this.n));
+    this.v = vect(this.n, this.u);
+};
+
+Camera.prototype.configureViewUVN = function(u,v,n){
+
+    this.u = u;
+    this.v = v;
+    this.n = n;
+
+    // Position stays
+    var dist = length(dif(this.position, this.look));
+
+    // Look is the old distance multiplied by the new looking vector n
+    this.look = mult(this.n, -dist);
+
+    // UP is negative v
+    this.up = this.v;
+
+    this.configureView(this.position, this.look, this.up);
 };
 
 /**
@@ -120,6 +134,10 @@ Camera.prototype.moveForward = function(space){
     this.moveDir(normalize(dif(this.look, this.position)), space);
 };
 
+Camera.prototype.moveBackwards = function(space){
+    this.moveDir(normalize(dif(this.look, this.position)), -space);
+};
+
 Camera.prototype.moveLeft = function(space){
     var dir = normalize(vect(this.up, normalize(dif(this.look, this.position))));
     this.moveDir(dir, space);
@@ -144,7 +162,46 @@ Camera.prototype.moveDir = function(dir, space){
     var move = mult(dir, space);
 
     this.position = sum(this.position,move);
-    this.look = sum(this.position,move);
+    this.look = sum(this.look,move);
 
     this.configureView(this.position, this.look, this.up);
-}
+};
+
+Camera.prototype.yaw = function(ang){
+    var cs = Math.cos(Math.PI/180.0 * ang);
+    var sn = Math.sin(Math.PI/180.0 * ang);
+
+    var t = new Vector3(this.u.elements);
+
+    this.u = normalize(dif(mult(this.u,cs), mult(this.n,sn)));
+    this.n = normalize(sum(mult(this.n,cs), mult(t,sn)));
+
+    this.configureViewUVN(this.u, this.v, this.n);
+};
+
+Camera.prototype.pitch = function(ang){
+    var cs = Math.cos(Math.PI/180.0 * ang);
+    var sn = Math.sin(Math.PI/180.0 * ang);
+
+    var t = new Vector3(this.n.elements);
+
+    this.n = normalize(dif(mult(this.n,cs), mult(this.v,sn)));
+    this.v = normalize(sum(mult(this.v,cs), mult(t,sn)));
+
+    this.configureViewUVN(this.u, this.v, this.n);
+};
+
+Camera.prototype.roll = function(ang){
+    var cs = Math.cos(Math.PI/180.0 * ang);
+    var sn = Math.sin(Math.PI/180.0 * ang);
+
+    var t = new Vector3(this.u.elements);
+
+    this.u = normalize(dif(mult(this.u,cs), mult(this.v,sn)));
+    this.v = normalize(sum(mult(this.v*cs), mult(t,sn)));
+
+    this.configureViewUVN(this.u, this.v, this.n);
+};
+
+
+

@@ -122,17 +122,8 @@ function start(gl){
 	 * Camera and projection
 	 */
 
-	camera = new Matrix4();
-	camera.setLookAt(-3,13,-13,0,0,0,0,1,0);
 	Camera.main.configureView(new Vector3([-3,13,-13]), new Vector3([0,0,0]));
-	//camera.setLookAt(LIGHT_X,LIGHT_Y,LIGHT_Z,0,0,0,0,1,0);
-
-	projection = new Matrix4();
-	projection.setPerspective(30, canvas.width/canvas.height, 1,100);
 	Camera.main.configureProjection(false, canvas.width,canvas.height, 1, 100, 30);
-
-	var identity = new Matrix4();
-	identity.setIdentity();
 
 
 	/**
@@ -140,13 +131,13 @@ function start(gl){
 	 */
 
 	switchProgram(gl,shadowProgram);
-	gl.uniformMatrix4fv(shadowProgram.u_ProjMatrix, false, projection.elements);
+	gl.uniformMatrix4fv(shadowProgram.u_ProjMatrix, false, Camera.main.projection.elements);
 
 	switchProgram(gl,lightProgram);
 	// Set the light color (white)
 	gl.uniform3f(lightProgram.u_AmbientLight, 0.15, 0.15, 0.15);
-	gl.uniformMatrix4fv(lightProgram.u_ViewMatrix, false, camera.elements);
-	gl.uniformMatrix4fv(lightProgram.u_ProjMatrix, false, projection.elements);
+	gl.uniformMatrix4fv(lightProgram.u_ViewMatrix, false, Camera.main.view.elements);
+	gl.uniformMatrix4fv(lightProgram.u_ProjMatrix, false, Camera.main.projection.elements);
 
 
 
@@ -199,7 +190,7 @@ function start(gl){
 	scene.addObject(cube3);
 	// Cube
 	var cube4 = createCube(gl, lightProgram);
-	cube4.setTranslate(0.0, 0, 1.0)
+	cube4.setTranslate(0.0, 0, 1.0);
 	cube4.scale(0.3,0.3,0.3);
 	cube4.scale(1.5,1.5,1.5);
 	scene.addObject(cube4);
@@ -269,7 +260,45 @@ var ang = 0 ;
 var lastFramebuffer;
 var currentFramebuffer;
 
+var yawn = 0, pitched = 0;
+
 function draw(gl) {
+
+	if(Controller.w)
+		Camera.main.moveForward(0.1);
+
+	if(Controller.a)
+		Camera.main.moveLeft(0.1);
+
+	if(Controller.s)
+		Camera.main.moveBackwards(0.1);
+
+	if(Controller.d)
+		Camera.main.moveRight(0.1);
+
+	if(Controller.space)
+		Camera.main.moveUp(0.1);
+
+	if(Controller.shift)
+		Camera.main.moveDown(0.1);
+
+	switchProgram(gl,lightProgram);
+
+	gl.uniformMatrix4fv(lightProgram.u_ViewMatrix, false, Camera.main.view.elements);
+	gl.uniformMatrix4fv(lightProgram.u_ProjMatrix, false, Camera.main.projection.elements);
+
+	var toYaw = currentAngle[1] - yawn;
+	var toPitch = currentAngle[0] - pitched;
+
+	if(toYaw!=0){
+		Camera.main.yaw(toYaw/3.0);
+		yawn += toYaw;
+	}
+	if(toPitch!=0) {
+		Camera.main.pitch(toPitch/3.0);
+		pitched += toPitch;
+	}
+
 
 	// ROTATION TRANSFORM
 	cubeBackup.set(cube.matrix);
