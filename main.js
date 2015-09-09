@@ -26,7 +26,22 @@ function main() {
 		return;
 	}
 
+	createProgramFiles(gl, 'Normal.vert', 'Normal.frag', function(program){
+		normalProgram = program;
 
+		normalProgram.framebuffer = initFramebufferObject(gl)[0];
+
+		switchProgram(gl,normalProgram);
+
+		normalProgram.a_Position = gl.getAttribLocation(normalProgram, "a_Normal");
+		normalProgram.a_Position = gl.getAttribLocation(normalProgram, "a_Position");
+
+		// Min shader vars
+		normalProgram.u_ViewMatrix = gl.getUniformLocation(normalProgram, 'u_ViewMatrix');
+		normalProgram.u_ProjMatrix = gl.getUniformLocation(normalProgram, 'u_ProjMatrix');
+		normalProgram.u_ModelMatrix = gl.getUniformLocation(normalProgram, "u_ModelMatrix");
+
+	});
 
 	// Load the shaders from files
 	createProgramFiles(gl, 'Point.vert', 'Point.frag', function(program){
@@ -97,6 +112,8 @@ function main() {
 		if(lightProgram)
 			start(gl);
 	});
+
+
 }
 
 var cube;
@@ -264,6 +281,10 @@ var yawn = 0, pitched = 0;
 
 function draw(gl) {
 
+	/**
+	 * Camera management
+	 * */
+
 	if(Controller.w)
 		Camera.main.moveForward(0.1);
 
@@ -300,6 +321,10 @@ function draw(gl) {
 	}
 
 
+	/**
+	 * Scene drawing
+	 * */
+
 	// ROTATION TRANSFORM
 	cubeBackup.set(cube.matrix);
 
@@ -318,6 +343,10 @@ function draw(gl) {
 		scene.renderTo(currentFramebuffer);
 
 	scene.draw();
+
+	/**
+	 * PostProcessing shader
+	 */
 
 	if(currentShader != null) {
 
@@ -343,6 +372,18 @@ function draw(gl) {
 		this.gl.activeTexture(glTextureIndex(this.gl, 0));
 		this.gl.bindTexture(this.gl.TEXTURE_2D, currentFramebuffer.texture);
 		this.gl.uniform1i(currentShader.program.u_DiffuseSampler, 0);
+
+		if(currentShader.program.u_NormalSampler !== undefined){
+
+			scene.renderTo(normalProgram.framebuffer);
+			scene.do("onRender", normalProgram);
+
+			this.gl.activeTexture(glTextureIndex(this.gl, 1));
+			this.gl.bindTexture(this.gl.TEXTURE_2D, normalProgram.framebuffer.texture);
+			this.gl.uniform1i(currentShader.program.u_NormalSampler, 1);
+
+			scene.renderTo(null);
+		}
 
 		if(currentShader.program.u_PrevSampler !== undefined){
 			this.gl.activeTexture(glTextureIndex(this.gl, 1));

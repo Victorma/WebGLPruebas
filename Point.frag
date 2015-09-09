@@ -44,9 +44,6 @@ varying vec4 v_Position;
 varying vec4 v_Color;
 varying vec4 v_Uv;
 
-const float numLayers = 4.0;
-const float factor = 1.0/numLayers;
-
 float unpack(vec4 rgbaDepth){
 	return rgbaDepth.r;
 }

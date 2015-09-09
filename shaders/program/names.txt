@@ -24,4 +24,5 @@ phosphor.json
 scan_pincushion.json
 sobel.json
 spider.json
+toon.json
 wobble.json
