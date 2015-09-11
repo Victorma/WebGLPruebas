@@ -26,14 +26,20 @@ function main() {
 		return;
 	}
 
-	createProgramFiles(gl, 'Normal.vert', 'Normal.frag', function(program){
-		normalProgram = program;
+	loadExternalShader("Shadow.json", "shaders/render/", function(shader){
+		shadowProgram = shader.program;
+		start(gl);
+	});
 
-		normalProgram.framebuffer = initFramebufferObject(gl)[0];
+	/*
+	createProgramFiles(gl, 'Normal.vert', 'Normal.frag', function(program){
+		normalProgram = program
+
+		normalProgram.framebuffer = initFramebufferObject(gl, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT)[0];
 
 		switchProgram(gl,normalProgram);
 
-		normalProgram.a_Position = gl.getAttribLocation(normalProgram, "a_Normal");
+		normalProgram.a_Normal = gl.getAttribocation(normalProgram, "a_Normal");
 		normalProgram.a_Position = gl.getAttribLocation(normalProgram, "a_Position");
 
 		// Min shader vars
@@ -72,10 +78,10 @@ function main() {
 		lightProgram.u_Lights = [];
 		for(var i = 0; i<2; i++){
 			lightProgram.u_Lights[i] = {};
-			/* ** Definition **
-			 * Type 1: Directional
-			 * Type 2: Point
-			 * Type 3: Focus */
+			// ** Definition **
+			// * Type 1: Directional
+			// * Type 2: Point
+			// * Type 3: Focus
 			lightProgram.u_Lights[i].type = gl.getUniformLocation(lightProgram, 'u_Lights[' + i + '].type');
 			lightProgram.u_Lights[i].enabled = gl.getUniformLocation(lightProgram, 'u_Lights[' + i + '].enabled');
 			// General props
@@ -111,9 +117,8 @@ function main() {
 
 		if(lightProgram)
 			start(gl);
-	});
 
-
+	});*/
 }
 
 var cube;
@@ -142,29 +147,13 @@ function start(gl){
 	Camera.main.configureView(new Vector3([-3,13,-13]), new Vector3([0,0,0]));
 	Camera.main.configureProjection(false, canvas.width,canvas.height, 1, 100, 30);
 
-
-	/**
-	 * Minimal shader config
-	 */
-
-	switchProgram(gl,shadowProgram);
-	gl.uniformMatrix4fv(shadowProgram.u_ProjMatrix, false, Camera.main.projection.elements);
-
-	switchProgram(gl,lightProgram);
-	// Set the light color (white)
-	gl.uniform3f(lightProgram.u_AmbientLight, 0.15, 0.15, 0.15);
-	gl.uniformMatrix4fv(lightProgram.u_ViewMatrix, false, Camera.main.view.elements);
-	gl.uniformMatrix4fv(lightProgram.u_ProjMatrix, false, Camera.main.projection.elements);
-
-
-
 	/**
 	 * Scene creation
 	 */
 
-	scene = new Scene(gl, lightProgram, shadowProgram);
+	scene = new Scene(gl);
 	// Directional Light
-	directionalLightObject = new SceneObject(gl, shadowProgram);
+	directionalLightObject = new SceneObject(gl);
 	directionalLight = new Light(gl, shadowProgram);
 	directionalLight.type = 1;
 	directionalLight.direction = new Vector3([4.0, 4.0, 0.0]);
@@ -173,48 +162,58 @@ function start(gl){
 		directionalLight.direction.elements[1],
 		directionalLight.direction.elements[2]);
 	directionalLight.color = new Vector3([0.1, 0.1, 0.1]);
-	directionalLight.casts = 0;
+	directionalLight.casts = 1;
 	directionalLightObject.addComponent(directionalLight);
 	directionalLight.onParametersChanged();
 	scene.addObject(directionalLightObject);
 
 	// Positional Light
-	positionalLightObject = new SceneObject(gl, shadowProgram);
+	positionalLightObject = new SceneObject(gl);
 	positionalLight = new Light(gl, shadowProgram);
 	positionalLight.type = 2;
 	positionalLightObject.setTranslate(LIGHT_X, LIGHT_Y, LIGHT_Z);
 	positionalLight.color = new Vector3([0.8, 0.4, 0.4]);
-	positionalLight.casts = 0;
+	positionalLight.casts = 1;
 	positionalLightObject.addComponent(positionalLight);
 	positionalLight.onParametersChanged();
 	scene.addObject(positionalLightObject);
 
+	var lightMaterial = new Material(gl);
+	lightMaterial.load("Point.json", "shaders/render/", function(material){
+		material.set("AmbientLight", "float", 3, [0.15, 0.15, 0.15]);
+	});
 
 	// Cube
-	cube = createCube(gl, lightProgram);
+	cube = createCube(gl);
 	cube.setTranslate(0.0, 0, 0.0);
+	cube.addComponent(lightMaterial);
 	scene.addObject(cube);
 	// Cube
-	var cube2 = createCube(gl, lightProgram);
+	var cube2 = createCube(gl);
 	cube2.setTranslate(3.0, 1, 0.0);
 	cube2.scale(0.3,0.3,0.3);
+	cube2.addComponent(lightMaterial);
 	scene.addObject(cube2);
 	// Cube
-	var cube3 = createCube(gl, lightProgram);
+	var cube3 = createCube(gl);
 	cube3.setTranslate(1.0, 0, 0.0);
 	cube3.scale(0.3,0.3,0.3);
+	cube3.addComponent(lightMaterial);
 
 	scene.addObject(cube3);
 	// Cube
-	var cube4 = createCube(gl, lightProgram);
+	var cube4 = createCube(gl);
 	cube4.setTranslate(0.0, 0, 1.0);
 	cube4.scale(0.3,0.3,0.3);
 	cube4.scale(1.5,1.5,1.5);
+	cube4.addComponent(lightMaterial);
 	scene.addObject(cube4);
 	// Plane
-	plane = createPlane(gl, lightProgram);
+	plane = createPlane(gl);
 	plane.setTranslate(-1,-1,0.0);
 	plane.scale(10.0,1.0,10.0);
+	plane.addComponent(lightMaterial);
+
 	scene.addObject(plane);
 
 	// Register the event handler
@@ -224,9 +223,6 @@ function start(gl){
 	lastFramebuffer = initFramebufferObject(gl, canvas.width, canvas.height)[0];
 	currentFramebuffer = initFramebufferObject(gl, canvas.width, canvas.height)[0];
 
-	/*var postRenderVertices = new Float32Array([
-		-1.0, -1.0, 0.0,  1.0, -1.0, 0.0,  -1.0, 1.0, 0.0,  1.0, 1.0, 0.0
-	]);*/
 
 	var postRenderVertices = new Float32Array([
 		0.0, 0.0, 0.0,  1.0, 0.0, 0.0,  0.0, 1.0, 0.0,  1.0, 1.0, 0.0
@@ -244,7 +240,7 @@ function start(gl){
 		0, 1, 3, 0, 3, 2 // down
 	]);
 
-	var postRenderObject = new SceneObject(gl,lightProgram);
+	var postRenderObject = new SceneObject(gl);
 	var postRenderRenderer = new Renderer(gl, lightProgram);
 	postRenderRenderer.vertices = postRenderVertices;
 	postRenderRenderer.colors = postRenderColors;
@@ -252,11 +248,11 @@ function start(gl){
 	postRenderRenderer.triangles = postRenderIndexes;
 	postRenderRenderer.onChangePoints();
 	postRenderObject.addComponent(postRenderRenderer);
+	postRenderMaterial = new Material(gl);
+	postRenderObject.addComponent(postRenderMaterial);
 
-	postRenderScene = new Scene(gl,lightProgram, shadowProgram);
+	postRenderScene = new Scene(gl);
 	postRenderScene.addObject(postRenderObject);
-
-
 
 	var tick = function() {
 		draw(gl);
@@ -302,11 +298,6 @@ function draw(gl) {
 
 	if(Controller.shift)
 		Camera.main.moveDown(0.1);
-
-	switchProgram(gl,lightProgram);
-
-	gl.uniformMatrix4fv(lightProgram.u_ViewMatrix, false, Camera.main.view.elements);
-	gl.uniformMatrix4fv(lightProgram.u_ProjMatrix, false, Camera.main.projection.elements);
 
 	var toYaw = currentAngle[1] - yawn;
 	var toPitch = currentAngle[0] - pitched;
@@ -375,14 +366,19 @@ function draw(gl) {
 
 		if(currentShader.program.u_NormalSampler !== undefined){
 
+			switchProgram(gl,normalProgram);
+
+			gl.uniformMatrix4fv(normalProgram.u_ViewMatrix, false, Camera.main.view.elements);
+			gl.uniformMatrix4fv(normalProgram.u_ProjMatrix, false, Camera.main.projection.elements);
+
 			scene.renderTo(normalProgram.framebuffer);
-			scene.do("onRender", normalProgram);
+			scene.do("onRender",normalProgram);
+			scene.renderTo(null);
+			switchProgram(gl, currentShader.program);
 
 			this.gl.activeTexture(glTextureIndex(this.gl, 1));
 			this.gl.bindTexture(this.gl.TEXTURE_2D, normalProgram.framebuffer.texture);
 			this.gl.uniform1i(currentShader.program.u_NormalSampler, 1);
-
-			scene.renderTo(null);
 		}
 
 		if(currentShader.program.u_PrevSampler !== undefined){

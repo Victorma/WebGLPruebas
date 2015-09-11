@@ -1,10 +1,9 @@
-var SceneObject = function(gl, program) {
+var SceneObject = function(gl) {
 
     /**
      * Context
      */
     this.gl = gl;
-    this.program = program;
 
 
     /**
@@ -75,6 +74,14 @@ SceneObject.prototype.onObjectUpdate = function(object, component) {
 };
 
 
+SceneObject.prototype.getComponent = function(type){
+    for(var c in this.components)
+        if(this.components[c] instanceof type)
+            return this.components[c];
+
+    return undefined;
+};
+
 SceneObject.prototype.addComponent = function(component){
     this.components.push(component);
     component.sceneObject = this;
@@ -86,7 +93,7 @@ SceneObject.prototype.addComponent = function(component){
  OnSomething can be OnPreRender, OnRender, OnPostRender, etc.
  */
 
-SceneObject.prototype.onSomething = function(call, scene, shader){
+SceneObject.prototype.onSomething = function(call, scene, pool, shader){
     if(this.components.length == 0 && this.childs.length == 0)
         return;
 
@@ -96,11 +103,11 @@ SceneObject.prototype.onSomething = function(call, scene, shader){
     var i;
     for(i = 0; i<this.components.length; i++){
         if(this.components[i][call])
-            this.components[i][call](scene, shader);
+            this.components[i][call](scene, pool, shader);
     }
 
     for(i = 0; i<this.childs.length; i++){
-        this.childs[i].onSomething(call, scene, shader);
+        this.childs[i].onSomething(call, scene, pool, shader);
     }
 
     scene.popMatrix();

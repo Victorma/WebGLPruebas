@@ -221,33 +221,6 @@ float IsEdge(vec2 coords)
 void main(){
 
     vec4 center = texture2D(NormalSampler, texCoord);
-    /*vec4 up     = texture2D(DiffuseSampler, texCoord + vec2(        0.0, -oneTexel.y));
-    vec4 up2    = texture2D(DiffuseSampler, texCoord + vec2(        0.0, -oneTexel.y) * 2.0);
-    vec4 down   = texture2D(DiffuseSampler, texCoord + vec2( oneTexel.x,         0.0));
-    vec4 down2  = texture2D(DiffuseSampler, texCoord + vec2( oneTexel.x,         0.0) * 2.0);
-    vec4 left   = texture2D(DiffuseSampler, texCoord + vec2(-oneTexel.x,         0.0));
-    vec4 left2  = texture2D(DiffuseSampler, texCoord + vec2(-oneTexel.x,         0.0) * 2.0);
-    vec4 right  = texture2D(DiffuseSampler, texCoord + vec2(        0.0,  oneTexel.y));
-    vec4 right2 = texture2D(DiffuseSampler, texCoord + vec2(        0.0,  oneTexel.y) * 2.0);
-    vec4 ul     = texture2D(DiffuseSampler, texCoord + vec2(-oneTexel.x, -oneTexel.y));
-    vec4 ur     = texture2D(DiffuseSampler, texCoord + vec2( oneTexel.x, -oneTexel.y));
-    vec4 bl     = texture2D(DiffuseSampler, texCoord + vec2(-oneTexel.x,  oneTexel.y));
-    vec4 br     = texture2D(DiffuseSampler, texCoord + vec2( oneTexel.x,  oneTexel.y));
-    vec4 gray = vec4(0.3, 0.59, 0.11, 0.0);
-    float uDiff = dot(abs(center - up), gray);
-    float dDiff = dot(abs(center - down), gray);
-    float lDiff = dot(abs(center - left), gray);
-    float rDiff = dot(abs(center - right), gray);
-    float u2Diff = dot(abs(center - up2), gray);
-    float d2Diff = dot(abs(center - down2), gray);
-    float l2Diff = dot(abs(center - left2), gray);
-    float r2Diff = dot(abs(center - right2), gray);
-    float ulDiff = dot(abs(center - ul), gray);
-    float urDiff = dot(abs(center - ur), gray);
-    float blDiff = dot(abs(center - bl), gray);
-    float brDiff = dot(abs(center - br), gray);
-    float sum = uDiff + dDiff + lDiff + rDiff + u2Diff + d2Diff + l2Diff + r2Diff + ulDiff + urDiff + blDiff + brDiff;
-    float sumLuma = clamp(sum, 0.0, 1.0);*/
 
     // float l = max(center.x, max(center.y, center.z));
     // float l = length(center);
@@ -259,7 +232,7 @@ void main(){
 
     vec4 sobel = calculateSobel(texCoord);
 
-    if(sobel.r > 0.1)
+    if(sobel.r == 1.0)
         gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
     else
         gl_FragColor = vec4(center.xyz, 1.0 - sobel.r);
@@ -289,7 +262,7 @@ void mainAux()
     ValLevels[3] = 1.0;
 
 
-    vec3 colorOrg = texture2D(DiffuseSampler, texCoord).rgb;
+    vec3 colorOrg = texture2D(NormalSampler, texCoord).rgb;
     vec3 vHSV =  RGBtoHSV(colorOrg.r,colorOrg.g,colorOrg.b);
     vHSV.x = nearestLevel(vHSV.x, 0);
     vHSV.y = nearestLevel(vHSV.y, 1);

@@ -26,19 +26,8 @@ Light.LightsConfigured = 0;
 Light.prototype.onCreate = function(){
 
     var callbackThis = this;
-    createProgramFiles(this.gl, "LightPoint.vert", "LightPoint.frag", function(lightPointShader){
-
-        switchProgram(callbackThis.gl, callbackThis.lightPointShader);
-
-        lightPointShader.u_ViewMatrix = callbackThis.gl.getUniformLocation(lightPointShader, 'u_ViewMatrix');
-        lightPointShader.u_ProjMatrix = callbackThis.gl.getUniformLocation(lightPointShader, 'u_ProjMatrix');
-        lightPointShader.u_ModelMatrix = callbackThis.gl.getUniformLocation(lightPointShader, "u_ModelMatrix");
-
-        lightPointShader.u_Color = callbackThis.gl.getUniformLocation(lightPointShader, "u_Color");
-
-        lightPointShader.a_Position = callbackThis.gl.getAttribLocation(lightPointShader, "a_Position");
-
-        callbackThis.lightPointShader = lightPointShader;
+    loadExternalShader("LightPoint.json", "shaders/render/", function(lightPointShader){
+        callbackThis.lightPointShader = lightPointShader.program;
     });
 
     this.number = Light.LightCount;
@@ -50,6 +39,10 @@ Light.prototype.onCreate = function(){
     this.casts = 0;
     this.near = 0.05;
     this.far = 100.0;
+
+    this.projection = new Matrix4();
+    this.view = new Matrix4();
+    this.matrix = new Matrix4();
 
     this.bias = new Matrix4({
         elements : [0.5, 0.0, 0.0, 0.0,
@@ -99,190 +92,158 @@ function putImage(gl, destination, width, height){
     img.src = canvas.toDataURL();
 }
 
+Light.prototype.recalculate = function(scene){
+
+    this.projection.setIdentity();
+
+    if(this.type == 1){
+        this.view.setIdentity();
+
+        this.view.setLookAt(
+            this.direction.elements[0]*3,
+            this.direction.elements[1]*3,
+            this.direction.elements[2]*3,
+            0,0,0,0,1,0);
+        this.projection.setOrtho(-10, 10, -10, 10, this.near, this.far);
+        if(this.framebuffer == null)
+            this.framebuffer = initFramebufferObject(this.gl, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT)[0];
+
+        this.matrix = new Matrix4(this.bias).multiply(new Matrix4(this.projection).multiply(new Matrix4(this.view)));
+
+    }else if(this.type == 2 || this.type == 3){
+        if(this.view.constructor !== Array){
+            this.view = [];
+            for(var i = 0; i<6; i++)
+                this.view[i] = new Matrix4();
+        }
+
+        if(this.framebuffer == null)
+            this.framebuffer = initFramebufferObject(this.gl, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT, this.gl.TEXTURE_CUBE_MAP);
+
+        var position = new Vector4([0.0, 0.0, 0.0, 1.0]);
+        position = scene.peekMatrix().multiplyVector4(position);
+
+
+
+        var p = position.elements;
+
+        this.faceDirections = [
+            new Vector3([ 1,0,0]), //  X
+            new Vector3([-1,0,0]), // -X
+            new Vector3([0, 1,0]), //  Y
+            new Vector3([0,-1,0]), // -Y
+            new Vector3([0,0, 1]), //  Z
+            new Vector3([0,0,-1])];// -Z
+
+        this.upDirections = [
+            new Vector3([0,-1,0]), //  X
+            new Vector3([0,-1,0]), // -X
+            new Vector3([0,0, 1]), //  Y
+            new Vector3([0,0,-1]), // -Y
+            new Vector3([0,-1,0]), //  Z
+            new Vector3([0,-1,0])];// -Z
+
+        for(var i = 0; i<6; i++) {
+            this.view[i].setIdentity();
+            var fd = this.faceDirections[i].elements;
+            var ud = this.upDirections[i].elements;
+            this.view[i].setLookAt(p[0], p[1], p[2], p[0]+fd[0], p[1]+fd[1], p[2]+fd[2],ud[0],ud[1],ud[2]);
+        }
+
+        this.projection.setPerspective(90, OFFSCREEN_WIDTH/OFFSCREEN_HEIGHT, this.near, this.far);
+
+        this.matrix = new Matrix4(this.bias).multiply(new Matrix4(this.projection).multiply(new Matrix4(this.view[4])));
+    }
+};
+
 /**
  * Draw to be called in draw moment
  */
-Light.prototype.onPreRender = function(scene, shader){
-
+Light.prototype.onPreRender = function(scene, uniformsPool, shader){
 
     if(this.needToRecalculate){
         this.needToRecalculate = false;
-
-        delete this.matrix;
-        delete this.projection;
-        delete this.view;
-
-        this.projection = new Matrix4();
-        this.view = new Matrix4();
-        this.projection.setIdentity();
-        this.view.setIdentity();
-
-        if(this.type == 1){
-            this.view.setLookAt(
-                this.direction.elements[0]*3,
-                this.direction.elements[1]*3,
-                this.direction.elements[2]*3,
-                0,0,0,0,1,0);
-            this.projection.setOrtho(-10, 10, -10, 10, this.near, this.far);
-            if(this.framebuffer == null)
-                this.framebuffer = initFramebufferObject(this.gl, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT)[0];
-
-            this.matrix = new Matrix4(this.bias).multiply(new Matrix4(this.projection).multiply(new Matrix4(this.view)));
-
-        }else if(this.type == 2 || this.type == 3){
-
-            if(this.framebuffer == null)
-                this.framebuffer = initFramebufferObject(this.gl, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT, this.gl.TEXTURE_CUBE_MAP);
-
-            var position = new Vector4([0.0, 0.0, 0.0, 1.0]);
-            position = scene.peekMatrix().multiplyVector4(position);
-
-            this.view = [];
-
-            var p = position.elements;
-
-            this.faceDirections = [
-                new Vector3([ 1,0,0]), //  X
-                new Vector3([-1,0,0]), // -X
-                new Vector3([0, 1,0]), //  Y
-                new Vector3([0,-1,0]), // -Y
-                new Vector3([0,0, 1]), //  Z
-                new Vector3([0,0,-1])];// -Z
-
-            this.upDirections = [
-                new Vector3([0,-1,0]), //  X
-                new Vector3([0,-1,0]), // -X
-                new Vector3([0,0, 1]), //  Y
-                new Vector3([0,0,-1]), // -Y
-                new Vector3([0,-1,0]), //  Z
-                new Vector3([0,-1,0])];// -Z
-
-            for(var i = 0; i<6; i++) {
-                this.view[i] = new Matrix4();
-                this.view[i].setIdentity();
-                var fd = this.faceDirections[i].elements;
-                var ud = this.upDirections[i].elements;
-                this.view[i].setLookAt(p[0], p[1], p[2], p[0]+fd[0], p[1]+fd[1], p[2]+fd[2],ud[0],ud[1],ud[2]);
-            }
-
-            this.projection.setPerspective(90, OFFSCREEN_WIDTH/OFFSCREEN_HEIGHT, this.near, this.far);
-
-
-            this.matrix = new Matrix4(this.bias).multiply(new Matrix4(this.projection).multiply(new Matrix4(this.view[4])));
-        }
-
-
-        //this.matrix = /*this.bias.multiply*/(this.projection.multiply(this.view));
+        this.recalculate(scene);
     }
 
-    if((!shader || !this.framebuffer.shadowsCalculated) && this.casts) {
+    if(this.casts && (!shader || !this.framebuffer.shadowsCalculated)) {
         // Lets generate the shadows
         switchProgram(this.gl, this.program);
 
         this.startShadowCalculation();
+
+        var oldProjection = uniformsPool["ProjMatrix"];
+        var oldView = uniformsPool["ViewMatrix"];
 
         if(this.type == 1){
             this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebuffer);
             this.gl.viewport(0, 0, this.framebuffer.width, this.framebuffer.height);
             this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
+            uniformsPool["ViewMatrix"] = { "type" : "matrix4x4", "count" : 16, "values" : this.view.elements };
+            uniformsPool["ProjMatrix"] = { "type" : "matrix4x4", "count" : 16, "values" : this.projection.elements };
 
-            this.gl.uniformMatrix4fv(this.program.u_ProjMatrix, false, this.projection.elements);
-            this.gl.uniformMatrix4fv(this.program.u_ViewMatrix, false, this.view.elements);
+            scene.do("onRender", uniformsPool, this.program);
 
-            scene.do("onRender", this.program);
-
+            //putImage(this.gl, "img"+(this.number), this.framebuffer.width, this.framebuffer.height);
             this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
             this.gl.viewport(0, 0, canvas.width, canvas.height);
 
-            //putImage(this.gl, "img"+(this.number));
         }else if(this.type == 2){
-            this.gl.uniformMatrix4fv(this.program.u_ProjMatrix, false, this.projection.elements);
+            uniformsPool["ProjMatrix"] = { "type" : "matrix4x4", "count" : 16, "values" : this.projection.elements };
             // Render 6 times for cubemap
             for(var i = 0; i<6; i++){
                 this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebuffer[i]);
                 this.gl.viewport(0, 0, this.framebuffer[i].width, this.framebuffer[i].height);
                 this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
-                this.gl.uniformMatrix4fv(this.program.u_ViewMatrix, false, this.view[i].elements);
-                scene.do("onRender", this.program);
+                uniformsPool["ViewMatrix"] = { "type" : "matrix4x4", "count" : 16, "values" : this.view[i].elements };
 
-                //putImage(this.gl, "img"+(this.number+i));
+                scene.do("onRender", uniformsPool, this.program)
+                //putImage(this.gl, "img"+(this.number + i), this.framebuffer[i].width, this.framebuffer[i].height);
             }
 
             this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
             this.gl.viewport(0, 0, canvas.width, canvas.height);
         }
 
-        //
+        uniformsPool["ProjMatrix"] = oldProjection;
+        uniformsPool["ViewMatrix"] = oldView;
 
+        //
         this.endShadowCalculation();
         this.framebuffer.shadowsCalculated = true;
     }
 
-    var bcShader;
-    if(shader){
-        bcShader = this.program;
-        this.program = shader;
-    }
+    this.direction.normalize();
+    var position = new Vector4([0.0, 0.0, 0.0, 1.0]);
+    position = scene.peekMatrix().multiplyVector4(position);
+    position = [position.elements[0],position.elements[1], position.elements[2]];
 
-    if(this.gl.program != this.program) {
-        switchProgram(this.gl, this.program);
-    }
+    /*
+     * FILL THE UNIFORMS POOL
+     */
 
-    if(this.program.u_Lights !== undefined && this.program.u_Lights[this.number] !== undefined) {
-        this.gl.uniform1i(this.program.u_Lights[this.number].type, this.type);
-        this.gl.uniform1i(this.program.u_Lights[this.number].enabled, this.enabled);
-        this.direction.normalize();
-        this.gl.uniform3fv(this.program.u_Lights[this.number].direction, this.direction.elements);
+    var l = "Lights["+this.number+"].";
+    uniformsPool[l+"type"] = { "type" : "int", "count" : 1, "values" : [ this.type ]};
+    uniformsPool[l+"enabled"] = { "type" : "int", "count" : 1, "values" : [ this.enabled ]};
+    uniformsPool[l+"direction"] = { "type" : "float", "count" : 3, "values" : this.direction.elements};
+    uniformsPool[l+"position"] = { "type" : "float", "count" : 3, "values" : position};
+    uniformsPool[l+"color"] = { "type" : "float", "count" : 3, "values" : this.color.elements};
+    uniformsPool[l+"range"] = { "type" : "float", "count" : 1, "values" : [ this.range ]};
+    uniformsPool[l+"casts"] = { "type" : "int", "count" : 1, "values" : [ this.casts ]};
+    uniformsPool[l+"near"] = { "type" : "float", "count" : 1, "values" : [ this.near ]};
+    uniformsPool[l+"far"] = { "type" : "float", "count" : 1, "values" : [ this.far ]};
+    uniformsPool[l+"matrix"] = { "type" : "matrix4x4", "count" : 16, "values" : this.matrix.elements };
+    uniformsPool["NumLights"] = { "type" : "int", "count" : 1, "values" : [ Light.LightCount ]};
 
-        var position = new Vector4([0.0, 0.0, 0.0, 1.0]);
-        position = scene.peekMatrix().multiplyVector4(position);
-        this.gl.uniform3f(this.program.u_Lights[this.number].position, position.elements[0],position.elements[1], position.elements[2]);
-        this.gl.uniform3fv(this.program.u_Lights[this.number].color, this.color.elements);
-        this.gl.uniform1f(this.program.u_Lights[this.number].range, this.range);
-        this.gl.uniform1i(this.program.u_Lights[this.number].casts, this.casts);
+    var lt = (this.type == 2) ? this.gl.TEXTURE_CUBE_MAP : this.gl.TEXTURE_2D;
+    var s = (this.type == 2) ? "ShadowsCube["+this.number+"]" : "Shadows["+this.number+"]";
+    var t = (this.type == 2) ? this.framebuffer[0].texture : this.framebuffer.texture;
+    uniformsPool[s] = { "type" : lt, "value" : t};
 
-        this.gl.uniform1f(this.program.u_Lights[this.number].near, this.near);
-        this.gl.uniform1f(this.program.u_Lights[this.number].far, this.far);
-
-        this.gl.activeTexture(glTextureIndex(this.gl, this.number));
-        if(this.type == 1){
-            this.gl.bindTexture(this.gl.TEXTURE_2D, this.framebuffer.texture);
-            this.gl.uniform1i(this.program.u_Lights[this.number].shadows, this.number); // Pass gl.TEXTURE0
-        }else if(this.type == 2){
-            this.gl.bindTexture(this.gl.TEXTURE_CUBE_MAP, this.framebuffer[0].texture);
-            this.gl.uniform1i(this.program.u_Lights[this.number].shadowsCube, this.number); // Pass gl.TEXTURE0
-        }
-
-        this.gl.uniformMatrix4fv(this.program.u_Lights[this.number].matrix, false, this.matrix.elements);
-
-        this.gl.uniform1i(this.program.u_NumLights, Light.LightCount);
-    }
-
-    if(shader){
-        this.program = bcShader;
-    }
 };
 
-Light.prototype.onRender = function(scene, shader){
-
-    if(this.isCalculatingShadows){
-        var bcShader;
-        if(shader){
-            bcShader = this.program;
-            this.program = shader;
-        }
-
-        if(this.gl.program != this.program) {
-            switchProgram(this.gl, this.program);
-        }
-
-        if(shader) {
-            this.program = bcShader;
-        }
-    }
-};
 
 Light.prototype.onPostRender = function(scene, shader){
 
@@ -290,6 +251,7 @@ Light.prototype.onPostRender = function(scene, shader){
     if(!shader) { // Standard onRender call is performed without any shader
 
         if(this.lightPointShader) {
+            // TODO update this to new format
             switchProgram(this.gl, this.lightPointShader);
 
             this.gl.vertexAttrib4f(this.lightPointShader.a_Position, 0.0, 0.0, 0.0, 1.0);

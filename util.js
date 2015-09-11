@@ -191,8 +191,89 @@ function onShaderChanged(select){
 	}
 }
 
-function loadPostShader(shaderName){
-	if(shaders[shaderName] === undefined){
+function isBasic(type){
+	return type == "float" || type == "int" || type == "matrix4x4" || type == "sampler2D" || type == "samplerCube";
+}
+
+function doUniforms(uniforms, structs, callback, opt_prefix){
+	if(opt_prefix === undefined)
+		opt_prefix = "";
+
+	for(var u in uniforms)
+		doUniform(uniforms[u], structs, callback, opt_prefix);
+}
+
+function doUniformsNames(names, type, callback){
+	for(var name in names) {
+		callback(names[name], type);
+		//readUniformName(names[name], program);
+	}
+}
+
+function doUniform(uniform, structs, callback, opt_prefix){
+	if(opt_prefix === undefined)
+		opt_prefix = "";
+
+	if(isBasic(uniform.type))
+		callback(opt_prefix+uniform.name,uniform.type, uniform.count, uniform.values);
+	else
+		doUniforms(findStruct(uniform.type, structs), structs, opt_prefix + uniform.name + ".");
+}
+
+function readUniformName(uniformName, program){
+	program["u_"+uniformName] = gl.getUniformLocation(program, uniformName);
+}
+
+function doAttributes(names, callback){
+	for(var name in names)
+		callback(names[name]);
+		//readAttributeName(names[name], program);
+}
+
+function readAttributeName(attributeName, program){
+	program["a_"+attributeName] = gl.getAttribLocation(program, attributeName);
+}
+
+function doArrays(arrays, structs, callback){
+	for(var ar in arrays)
+		doArray(arrays[ar], structs, callback);
+}
+
+function doArray(array, structs, callback, opt_prefix){
+	if(opt_prefix === undefined)
+		opt_prefix = "";
+
+
+
+
+	if(isBasic(array.type)){
+		// Read single uniform
+		for(var i = 0; i<array.size; i++) {
+			var uName = opt_prefix + array.name + "[" + i + "]";
+			callback(uName, array.type, array.count, array.values[i]);
+			//readUniformName(uName, program);
+		}
+	}else{
+		// Read struct unifrom
+		for(var i = 0; i<array.size; i++) {
+			var uName = opt_prefix + array.name + "[" + i + "].";
+			doUniforms(findStruct(array.type, structs).vars, structs, callback, uName);
+		}
+	}
+}
+
+function findStruct(name, structs){
+	for(var s in structs){
+		if(structs[s].name == name)
+			return structs[s];
+	}
+	return undefined;
+}
+
+
+function loadExternalShader(shaderName, shaderDir, callback){
+	if(shaders[shaderName] === undefined) {
+		// lets load
 		var request = new XMLHttpRequest();
 		request.onreadystatechange = function() {
 			if (request.readyState === 4 && request.status !== 404){
@@ -204,30 +285,30 @@ function loadPostShader(shaderName){
 					function(program){
 						s.program = program;
 						switchProgram(gl,s.program);
-						for(var u in s.uniforms){
-							var uniform = s.uniforms[u];
-							s.program["u_"+uniform.name] = gl.getUniformLocation(s.program, uniform.name);
-						}
 
-						for(var sa in s.samplers){
-							var sampler = s.samplers[sa];
-							s.program["u_"+sampler] = gl.getUniformLocation(s.program, sampler);
-						}
+						// Load the vars
+						doUniforms(s.uniforms, s.structs, function(n){ readUniformName(n, s.program); });
+						doUniformsNames(s.samplers, "sampler", function(n){ readUniformName(n, s.program); });
+						doAttributes(s.attributes, function(n){ readAttributeName(n, s.program); });
+						doArrays(s.arrays, s.structs, function(n){ readUniformName(n, s.program); });
 
-						for(var a in s.attributes){
-							var attribute = s.attributes[a];
-							s.program["a_"+attribute] = gl.getAttribLocation(s.program, attribute);
-						}
-
-						currentShader = s;
+						// Once loaded
+						callback(s);
 					}
 				);
 			}
 		};
 		request.open('GET', shaderDir + shaderName, true);
 		request.send(); // Send the request
-	}else
+	}else // already load
+		callback(shaders[shaderName]);
+}
+
+
+function loadPostShader(shaderName){
+	loadExternalShader(shaderName, shaderDir, function(shader){
 		currentShader = shaders[shaderName];
+	});
 };
 
 function negative(v){

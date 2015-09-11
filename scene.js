@@ -1,11 +1,9 @@
 /**
  * Created by Victorma on 11/08/2015.
  */
-var Scene = function(gl, lightProgram, shadowProgram) {
+var Scene = function(gl) {
 
     this.gl = gl;
-    this.lightProgram = lightProgram;
-    this.shadowProgram = shadowProgram;
 
     this.rootObject = new SceneObject();
     this.lights = [];
@@ -19,16 +17,7 @@ var Scene = function(gl, lightProgram, shadowProgram) {
     this.framebuffer = null;
 };
 
-/**
- * On Create called just in creation time
- */
-Scene.prototype.draw = function(){
-
-    // Prerender things
-    this.do("onPreRender");
-    this.do("onPreRender", lightProgram);
-
-    // Render things
+Scene.prototype.bind = function(){
     var width = canvas.width,
         height = canvas.height;
 
@@ -40,25 +29,40 @@ Scene.prototype.draw = function(){
     this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebuffer);
     this.gl.viewport(0, 0, width, height);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+};
 
-    this.do("onRender");
+/**
+ * On Create called just in creation time
+ */
+Scene.prototype.draw = function(){
+
+    var pool = {};
+
+    // Lets put the camera in the pool :D
+    pool["ViewMatrix"] = { "type" : "matrix4x4", "count" : 16, "values" : Camera.main.view.elements };
+    pool["ProjMatrix"] = { "type" : "matrix4x4", "count" : 16, "values" : Camera.main.projection.elements };
+
+    // Prerender things
+    this.do("onPreRender", pool);
+
+    // Render things
+    this.bind();
+    this.do("onRender", pool);
 
     // PostRender things
     this.do("onPostRender");
-
-    //putImage(gl, "img0", width, height);
 };
 
-Scene.prototype.do = function(call, shader){
+Scene.prototype.do = function(call, pool, shader){
     var oldMatrixStack = this.matrixStack;
     this.matrixStack = [];
     this.matrixStack.push(this.identity);
 
     if(shader){
-        this.rootObject.onSomething(call, this, shader);
+        this.rootObject.onSomething(call, this, pool, shader);
     }else{
         // If no shader, lets clear the main buffer
-        this.rootObject.onSomething(call, this);
+        this.rootObject.onSomething(call, this, pool);
     }
 
     this.matrixStack = oldMatrixStack;

@@ -1,7 +1,6 @@
 precision mediump float;
 precision mediump int;
 
-
 #define MAX_LIGHTS 2
 
 struct Light {
@@ -26,16 +25,19 @@ struct Light {
 	// ShadowCast
 	int casts;
 
+	//samplerCube shadowsCube;
+
 	mat4 matrix;
 };
 
-uniform int u_NumLights;
-uniform Light u_Lights[MAX_LIGHTS];
-uniform sampler2D u_Shadows;
-uniform samplerCube u_ShadowsCube;
+uniform int NumLights;
+uniform Light Lights[MAX_LIGHTS];
 
 varying vec3 ambient;
 varying vec4 v_PositionFromLight[MAX_LIGHTS];
+
+uniform sampler2D Shadows[MAX_LIGHTS];
+uniform samplerCube ShadowsCube[MAX_LIGHTS];
 
 varying vec3 v_EyeDirection;
 
@@ -92,48 +94,28 @@ void main() {
 	vec3 point = vec3(0.0,0.0,0.0);
 
 	for(int i = 0; i<MAX_LIGHTS; i++){
-		if(i >= u_NumLights)
-			break;
-
 		float visibility = 1.0;
-		if(u_Lights[i].enabled == 1){
-			//if(i >= u_NumPositionalLights) break;
+		float specularVisibility = 1.0;
+		if(Lights[i].enabled == 1){
 
-			if(u_Lights[i].casts == 1){
+			if(Lights[i].casts == 1){
 				// Visibility calc
 				vec3 shadowCoord = (v_PositionFromLight[i].xyz / v_PositionFromLight[i].w);
 
 				float depth;
-				if(u_Lights[i].type == 1){
-					depth = directionalLightDepth(u_Shadows, shadowCoord); // Retrieve the z value from R
-				}else if(u_Lights[i].type == 2){
-					vec3 LightVector = (v_Position.xyz/v_Position.w) - u_Lights[i].position;
-					shadowCoord.z = VectorToDepth(LightVector,u_Lights[i]);
-					depth = pointLightDepth(u_ShadowsCube, normalize(LightVector));
+				if(Lights[i].type == 1){
+					depth = directionalLightDepth(Shadows[i], shadowCoord); // Retrieve the z value from R
+				}else if(Lights[i].type == 2){
+					vec3 LightVector = (v_Position.xyz/v_Position.w) - Lights[i].position;
+					shadowCoord.z = VectorToDepth(LightVector,Lights[i]);
+					depth = pointLightDepth(ShadowsCube[i], normalize(LightVector));
 				}
-				visibility = (shadowCoord.z > depth + 0.005) ? 0.7:1.0;
+				visibility = (shadowCoord.z > depth + 0.005) ? 0.3:1.0;
+				specularVisibility = (shadowCoord.z > depth + 0.005) ? 0.0:1.0;
 			}
 
-			/*if(u_Lights[i].type == 1){
-				// Directional light
-				float nDirL = max(dot(u_Lights[i].direction, v_Normal), 0.0);
+			point += (diffuse(Lights[i]) * visibility + specular(Lights[i]) * specularVisibility) ;
 
-				// Toon shader things
-				//nDirL = floor(nDirL*numLayers)*factor;
-				point += (u_Lights[i].color * vec3(v_Color) * nDirL) * visibility;
-
-			}else if(u_Lights[i].type == 2){
-				// Point light
-				vec3 lightDirection = normalize(u_Lights[i].position - vec3(v_Position));
-				float nDotL = max(dot(lightDirection, normalize(v_Normal)), 0.0);
-				// Toon shader things
-				//nDotL = floor(nDotL*numLayers)*factor;
-				if(nDotL == 0.0)
-					nDotL = factor*0.5;
-				point += (u_Lights[i].color * vec3(v_Color) * nDotL) * visibility;
-			}*/
-
-			point += (diffuse(u_Lights[i]) + specular(u_Lights[i])) * visibility;
 		}
 	}
 

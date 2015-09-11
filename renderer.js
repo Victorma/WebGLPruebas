@@ -1,10 +1,9 @@
-var Renderer = function(gl, program) {
+var Renderer = function(gl) {
 
 	/**
 	 * Context
 	 */
 	this.gl = gl;
-	this.program = program;
 
 	/**
 	 * Form
@@ -35,7 +34,6 @@ var Renderer = function(gl, program) {
 	 */
 
 	this.onCreate();
-	this.onChangeProgram();
 };
 
 /**
@@ -48,22 +46,6 @@ Renderer.prototype.onCreate = function(){
 	this.bufferColors = this.gl.createBuffer();
 	this.bufferNormals = this.gl.createBuffer();
 	this.bufferTriangles = this.gl.createBuffer();
-};
-
-/**
- * On Change program should be called when program is changed
- */
-Renderer.prototype.onChangeProgram = function(){
-	// Program management
-
-	this.a_Position = this.gl.getAttribLocation(lightProgram, "a_Position");
-	this.a_Uv = this.gl.getAttribLocation(lightProgram, "a_Uv");
-	this.a_Color = this.gl.getAttribLocation(lightProgram, "a_Color");
-	this.a_Normal  = this.gl.getAttribLocation(lightProgram, "a_Normal");
-
-	this.u_ModelMatrix = this.gl.getUniformLocation(this.program, 'u_ModelMatrix');
-	this.u_NormalMatrix = this.gl.getUniformLocation(this.program, 'u_NormalMatrix');
-
 };
 
 /**
@@ -122,45 +104,42 @@ Renderer.prototype.regenerateNormals = function(){
 /**
  * Draw to be called in draw moment
  */
-Renderer.prototype.onRender = function(scene, shader){
+Renderer.prototype.onRender = function(scene, uniformsPool, shader){
 
-	var bcShader;
+	var material = this.sceneObject.getComponent(Material);
+
+	var normalMatrix = new Matrix4();
+	normalMatrix.setInverseOf(scene.peekMatrix());
+	normalMatrix.transpose();
+
+	uniformsPool["ModelMatrix"] = { "type" : "matrix4x4", "count" : 16, "values" : scene.peekMatrix().elements };
+	uniformsPool["NormalMatrix"] = { "type" : "matrix4x4", "count" : 16, "values" : normalMatrix.elements };
+
 	if(shader){
-		bcShader = this.program;
-		this.program = shader;
+		switchProgram(gl, shader);
+		configureShaderUniforms(uniformsPool, shader, this.gl);
+	}else{
+		material.bind();
+		shader = material.getProgram();
+		if(shader === undefined)
+			return;
+
+		material.configure(uniformsPool);
 	}
 
-	if(this.gl.program != this.program) {
-		switchProgram(this.gl, this.program);
-	}
-
-	if(this.program.a_Position !== undefined)
-		enableBuffer(this.gl, this.bufferVertices, this.program.a_Position);
-	if(this.program.a_Uv !== undefined)
-		enableBuffer(this.gl, this.bufferUvs, this.program.a_Uv);
-	if(this.program.a_Color !== undefined)
-		enableBuffer(this.gl, this.bufferColors, this.program.a_Color);
-	if(this.program.a_Normal !== undefined)
-		enableBuffer(this.gl, this.bufferNormals, this.program.a_Normal);
+	if(shader.a_Position !== undefined)
+		enableBuffer(this.gl, this.bufferVertices, shader.a_Position);
+	if(shader.a_Uv !== undefined)
+		enableBuffer(this.gl, this.bufferUvs, shader.a_Uv);
+	if(shader.a_Color !== undefined)
+		enableBuffer(this.gl, this.bufferColors, shader.a_Color);
+	if(shader.a_Normal !== undefined)
+		enableBuffer(this.gl, this.bufferNormals, shader.a_Normal);
 
 	enableBuffer(this.gl, this.bufferTriangles);
 
-	if(this.program.u_ModelMatrix)
-		this.gl.uniformMatrix4fv(this.program.u_ModelMatrix, false, scene.peekMatrix().elements);
-
-	if(this.program.u_NormalMatrix){
-		var normalMatrix = new Matrix4();
-		normalMatrix.setInverseOf(scene.peekMatrix());
-		normalMatrix.transpose();
-		this.gl.uniformMatrix4fv(this.program.u_NormalMatrix, false, normalMatrix.elements);
-	}
-
 	//this.gl.drawArrays(this.gl.TRIANGLES, false, this.nElem);
 	this.gl.drawElements(this.gl.TRIANGLES, this.triangles.length, this.gl.UNSIGNED_BYTE, 0);
-
-	if(shader){
-		this.program = bcShader;
-	}
 };
 
 /**

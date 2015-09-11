@@ -1,10 +1,10 @@
 precision mediump int;
 precision mediump float;
 
-uniform mat4 u_ModelMatrix;
-uniform mat4 u_ViewMatrix;
-uniform mat4 u_ProjMatrix;
-uniform mat4 u_NormalMatrix;
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjMatrix;
+uniform mat4 NormalMatrix;
 
 // All lights
 #define MAX_LIGHTS 2
@@ -34,16 +34,16 @@ struct Light {
 	mat4 matrix;
 };
 
-uniform int u_NumLights;
-uniform Light u_Lights[MAX_LIGHTS];
+uniform int NumLights;
+uniform Light Lights[MAX_LIGHTS];
 
 // Ambient
-uniform vec3 u_AmbientLight;
+uniform vec3 AmbientLight;
 
-attribute vec4 a_Position;
-attribute vec4 a_Normal;
-attribute vec4 a_Color;
-attribute vec4 a_Uv;
+attribute vec4 Position;
+attribute vec4 Normal;
+attribute vec4 Color;
+attribute vec4 Uv;
 
 varying vec3 ambient;
 varying vec4 v_PositionFromLight[MAX_LIGHTS];
@@ -58,26 +58,26 @@ varying vec3 v_EyeDirection;
 
 void main() {
 	// Vertex position
-	v_Position = u_ModelMatrix * a_Position;
+	v_Position = ModelMatrix * Position;
 	// Aux view vertex position
-	vec3 EyePosition = (-u_ViewMatrix[3].xyz * mat3(u_ViewMatrix));
+	vec3 EyePosition = (-ViewMatrix[3].xyz * mat3(ViewMatrix));
     v_EyeDirection = EyePosition - v_Position.xyz;
 	// Final vertex rendering position (After view and projection transformations)
-	gl_Position = u_ProjMatrix * u_ViewMatrix * v_Position;
+	gl_Position = ProjMatrix * ViewMatrix * v_Position;
 
 	for(int i = 0; i<MAX_LIGHTS; i++){
-		if(i < u_NumLights){
-			v_PositionFromLight[i] = u_Lights[i].matrix * v_Position;
+		if(i < NumLights){
+			v_PositionFromLight[i] = Lights[i].matrix * v_Position;
 		}
 	}
 
 	// Normal inverse locator
-	v_Normal = normalize(vec3(u_NormalMatrix * a_Normal));
+	v_Normal = normalize(vec3(NormalMatrix * Normal));
 
     // Ambient Light
-    ambient = u_AmbientLight * a_Color.xyz;
+    ambient = AmbientLight * Color.xyz;
 
-	v_Color = a_Color;
-	v_Uv = a_Uv;
+	v_Color = Color;
+	v_Uv = Uv;
 	gl_PointSize = 1.0;
 }
