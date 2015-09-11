@@ -13,7 +13,7 @@ var planeUVs = new Float32Array([ // Vertex coordinates
     0.0, 0.0,	 1.0, 0.0,  1.0, 1.0,	0.0, 1.0
 ]);
 
-var planeIndexes = new Uint8Array([
+var planeIndexes = new Uint16Array([
     0, 2 , 1, 0, 3, 2 // down
 ]);
 

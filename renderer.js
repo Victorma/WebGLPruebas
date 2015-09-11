@@ -51,13 +51,16 @@ Renderer.prototype.onCreate = function(){
 /**
  * On Change points should be called when points are changed
  */
-Renderer.prototype.onChangePoints = function(){
+Renderer.prototype.onChangePoints = function(opt_normals){
+	if(opt_normals === undefined)
+		opt_normals = true;
+
 	this.nElem = putBuffer(this.gl, this.gl.ARRAY_BUFFER, this.bufferVertices, this.vertices, 3);
 	putBuffer(this.gl, this.gl.ARRAY_BUFFER, this.bufferUvs, this.uvs, 2);
 	putBuffer(this.gl, this.gl.ARRAY_BUFFER, this.bufferColors, this.colors, 4);
 	putBuffer(this.gl, this.gl.ELEMENT_ARRAY_BUFFER, this.bufferTriangles, this.triangles, 2);
 
-	this.regenerateNormals();
+	if(opt_normals) this.regenerateNormals();
 	putBuffer(this.gl, this.gl.ARRAY_BUFFER, this.bufferNormals, this.normals, 3);
 };
 
@@ -118,15 +121,27 @@ Renderer.prototype.onRender = function(scene, uniformsPool, shader){
 	if(shader){
 		switchProgram(gl, shader);
 		configureShaderUniforms(uniformsPool, shader, this.gl);
+		this.draw(shader);
 	}else{
-		material.bind();
-		shader = material.getProgram();
-		if(shader === undefined)
+		if(material === undefined)
 			return;
 
-		material.configure(uniformsPool);
-	}
+		material.iterate();
+		while(material.hasNext()){
+			materialShader = material.next();
+			shader = material.getProgram();
+			if(shader === undefined)
+				return;
 
+			material.configure(uniformsPool);
+			materialShader.onPreRender(scene);
+			this.draw(shader);
+			materialShader.onPostRender(scene);
+		}
+	}
+};
+
+Renderer.prototype.draw = function(shader){
 	if(shader.a_Position !== undefined)
 		enableBuffer(this.gl, this.bufferVertices, shader.a_Position);
 	if(shader.a_Uv !== undefined)
@@ -139,7 +154,7 @@ Renderer.prototype.onRender = function(scene, uniformsPool, shader){
 	enableBuffer(this.gl, this.bufferTriangles);
 
 	//this.gl.drawArrays(this.gl.TRIANGLES, false, this.nElem);
-	this.gl.drawElements(this.gl.TRIANGLES, this.triangles.length, this.gl.UNSIGNED_BYTE, 0);
+	this.gl.drawElements(this.gl.TRIANGLES, this.triangles.length, this.gl.UNSIGNED_SHORT, 0);
 };
 
 /**

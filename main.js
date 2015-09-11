@@ -124,18 +124,12 @@ function main() {
 var cube;
 var currentAngle;
 
-/**
- * Fragment matrices
- */
-var u_ModelMatrix;
-var u_ViewMatrix;
-var u_ProjMatrix;
 
 function start(gl){
 
 	Camera.init();
 
-	gl.clearColor(0.0, 0.0, 0.0, 1.0);
+	gl.clearColor(0.5, 0.5, 0.5, 1.0);
 	gl.enable(gl.DEPTH_TEST);
 	gl.enable(gl.BLEND);
 	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -179,8 +173,27 @@ function start(gl){
 	scene.addObject(positionalLightObject);
 
 	var lightMaterial = new Material(gl);
-	lightMaterial.load("Point.json", "shaders/render/", function(material){
-		material.set("AmbientLight", "float", 3, [0.15, 0.15, 0.15]);
+	lightMaterial.load("Point.json", "shaders/render/", function(){
+		lightMaterial.set("AmbientLight", "float", 3, [0.15, 0.15, 0.15]);
+	});
+
+	var toonMaterial = new Material(gl);
+	toonMaterial.load("Border.json", "shaders/render/", function(material, shader){
+		shader.onPreRender = function(scene){
+			gl.enable(gl.CULL_FACE);
+			gl.cullFace(gl.FRONT);
+			toonMaterial.set("Offset", "float", 1, [ 0.3 ]);
+			toonMaterial.set("Color", "float", 4, [ 0.0, 0.0, 0.0, 1.0 ]);
+		};
+
+		shader.onPostRender = function(scene){
+			gl.disable(gl.CULL_FACE);
+			gl.cullFace(gl.BACK);
+		}
+	});
+
+	toonMaterial.load("Cell.json", "shaders/render/", function() {
+		toonMaterial.set("AmbientLight", "float", 3, [0.15, 0.15, 0.15]);
 	});
 
 	// Cube
@@ -216,6 +229,63 @@ function start(gl){
 
 	scene.addObject(plane);
 
+	K3D.load("raptor.obj", function(data){
+		var m = K3D.parse.fromOBJ(data);	// done !
+		var sc = new SceneObject(gl);
+		var renderer = new Renderer(gl);
+
+		var ind = [];
+		for(var i=0; i<m.i_verts.length; i++) ind.push(i);
+		var colors = [];
+		for(var i=0; i<m.i_verts.length; i++){
+			colors.push(1.0); colors.push(1.0); colors.push(1.0); colors.push(1.0);
+		}
+
+		//	I need to index vertices and UVT with the same indices... 0, 1, 2, ...
+		renderer.vertices = new Float32Array(K3D.edit.unwrap(m.i_verts, m.c_verts, 3));
+		renderer.colors = new Float32Array(colors);
+		renderer.uvs = new Float32Array(K3D.edit.unwrap(m.i_uvt  , m.c_uvt  , 2));
+		renderer.normals = new Float32Array(K3D.edit.unwrap(m.i_norms  , m.c_norms  , 3));
+		renderer.triangles = new Uint16Array(ind);
+		renderer.onChangePoints(false);
+		sc.addComponent(renderer);
+		sc.addComponent(toonMaterial);
+		sc.setTranslate(2,1,0);
+		sc.scale(0.1,0.1,0.1);
+
+
+		scene.addObject(sc);
+	});
+
+	K3D.load("head.obj", function(data){
+		var m = K3D.parse.fromOBJ(data);	// done !
+		var sc = new SceneObject(gl);
+		var renderer = new Renderer(gl);
+
+		var ind = [];
+		for(var i=0; i<m.i_verts.length; i++) ind.push(i);
+		var colors = [];
+		for(var i=0; i<m.i_verts.length; i++){
+			colors.push(1.0); colors.push(1.0); colors.push(1.0); colors.push(1.0);
+		}
+
+		//	I need to index vertices and UVT with the same indices... 0, 1, 2, ...
+		renderer.vertices = new Float32Array(K3D.edit.unwrap(m.i_verts, m.c_verts, 3));
+		renderer.colors = new Float32Array(colors);
+		renderer.uvs = new Float32Array(K3D.edit.unwrap(m.i_uvt  , m.c_uvt  , 2));
+		renderer.normals = new Float32Array(K3D.edit.unwrap(m.i_norms  , m.c_norms  , 3));
+		renderer.triangles = new Uint16Array(ind);
+		renderer.onChangePoints(false);
+		sc.addComponent(renderer);
+		sc.addComponent(toonMaterial);
+		sc.setTranslate(0,0,0);
+		sc.rotate(180, 0,1,0);
+		sc.scale(0.1,0.1,0.1);
+
+
+		scene.addObject(sc);
+	});
+
 	// Register the event handler
 	currentAngle = [0.0, 0.0]; // [x-axis, y-axis] degrees
 	initEventHandlers(canvas, currentAngle);
@@ -236,7 +306,7 @@ function start(gl){
 		0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0
 	]);
 
-	var postRenderIndexes = new Uint8Array([
+	var postRenderIndexes = new Uint16Array([
 		0, 1, 3, 0, 3, 2 // down
 	]);
 

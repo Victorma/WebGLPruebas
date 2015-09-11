@@ -1,0 +1,42 @@
+{
+  "blend": {
+    "func": "add",
+    "srcrgb": "one",
+    "dstrgb": "zero"
+  },
+  "vertex": "Cell",
+  "fragment": "Cell",
+  "attributes": [ "Position", "Color", "Normal", "Uv" ],
+  "samplers": [
+    "Shadows[0]",
+    "ShadowsCube[0]",
+    "Shadows[1]",
+    "ShadowsCube[1]"
+  ],
+  "uniforms": [
+    { "name": "ProjMatrix", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "ViewMatrix", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "ModelMatrix", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "NormalMatrix", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "NumLights", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "CelShading", "type": "float", "count": 1, "values": [ 4.0 ] },
+    { "name": "AmbientLight", "type": "float", "count": 3, "values": [ 0.2, 0.2, 0.2 ] }
+  ],
+  "structs" : [
+    { "name" : "Light", "vars" : [
+      { "name": "type", "type": "int", "count": 1, "values": [ 0 ] },
+      { "name": "enabled", "type": "int", "count": 1, "values": [ 0 ] },
+      { "name": "direction", "type": "float", "count": 3, "values": [ 1.0, 0.0, 0.0 ] },
+      { "name": "position", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] },
+      { "name": "color", "type": "float", "count": 3, "values": [ 1.0, 1.0, 1.0 ] },
+      { "name": "range", "type": "float", "count": 1, "values": [ 10 ] },
+      { "name": "near", "type": "float", "count": 1, "values": [ 0.1 ] },
+      { "name": "far", "type": "float", "count": 1, "values": [ 100 ] },
+      { "name": "casts", "type": "int", "count": 1, "values": [ 0 ] },
+      { "name": "matrix", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] }
+    ] }
+  ],
+  "arrays" : [
+    { "name" : "Lights", "type":"Light", "size" : 2 }
+  ]
+}

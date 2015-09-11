@@ -25,7 +25,7 @@ var cubeUVs = new Float32Array([ // Vertex coordinates
 	0.0, 0.0,	 1.0, 0.0,  1.0, 1.0,	0.0, 1.0
 ]);
 
-var cubeIndexes = new Uint8Array([
+var cubeIndexes = new Uint16Array([
 	0, 1, 2, 0, 2, 3, // front
 	4, 5, 6, 4, 6, 7, // right
 	8, 9, 10, 8, 10, 11, // up
