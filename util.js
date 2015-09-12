@@ -283,7 +283,7 @@ function loadExternalShader(shaderName, shaderDir, callback){
 					shaderDir + s.vertex+".vsh",
 					shaderDir + s.fragment+".fsh",
 					function(program){
-						console.log("Shader "+shaderName+" loaded: OK");
+						console.log("Shader "+shaderName+" loaded: " + ((program)? "OK" : "FAIL"));
 						s.program = program;
 						switchProgram(gl,s.program);
 

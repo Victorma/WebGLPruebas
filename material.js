@@ -60,10 +60,10 @@ Material.prototype.load = function(shaderName, shaderPath, callback){
         material.currentShader = shaderName;
         material.ready = true;
         material.bind();
-        doUniforms(material.shader.uniforms, material.shader.structs, function(n, t, c, v){
+        doUniforms(shader.uniforms, shader.structs, function(n, t, c, v){
             material.set.apply(material,[n,t,c,v]);
         });
-        doArrays(material.shader.arrays, material.shader.structs, function(n,t,c,v){
+        doArrays(shader.arrays, shader.structs, function(n,t,c,v){
             material.set.apply(material,[n,t,c,v]);
         });
         callback(material,shader);

@@ -156,7 +156,7 @@ function start(gl){
 		directionalLight.direction.elements[1],
 		directionalLight.direction.elements[2]);
 	directionalLight.color = new Vector3([0.1, 0.1, 0.1]);
-	directionalLight.casts = 1;
+	directionalLight.casts = 0;
 	directionalLightObject.addComponent(directionalLight);
 	directionalLight.onParametersChanged();
 	scene.addObject(directionalLightObject);
@@ -167,7 +167,7 @@ function start(gl){
 	positionalLight.type = 2;
 	positionalLightObject.setTranslate(LIGHT_X, LIGHT_Y, LIGHT_Z);
 	positionalLight.color = new Vector3([0.8, 0.4, 0.4]);
-	positionalLight.casts = 1;
+	positionalLight.casts = 0;
 	positionalLightObject.addComponent(positionalLight);
 	positionalLight.onParametersChanged();
 	scene.addObject(positionalLightObject);
@@ -255,7 +255,7 @@ function start(gl){
 
 	lastFramebuffer = initFramebufferObject(gl, canvas.width, canvas.height)[0];
 	currentFramebuffer = initFramebufferObject(gl, canvas.width, canvas.height)[0];
-
+	swapBuffer = initFramebufferObject(gl, canvas.width, canvas.height)[0];
 
 	var postRenderVertices = new Float32Array([
 		0.0, 0.0, 0.0,  1.0, 0.0, 0.0,  0.0, 1.0, 0.0,  1.0, 1.0, 0.0
@@ -273,6 +273,10 @@ function start(gl){
 		0, 1, 3, 0, 3, 2 // down
 	]);
 
+	postRenderMatrix = new Matrix4();
+	postRenderMatrix.setScale(2.0, 2.0, 1.0);
+	postRenderMatrix.translate(-0.5,-0.5,0.0);
+
 	var postRenderObject = new SceneObject(gl);
 	var postRenderRenderer = new Renderer(gl);
 	postRenderRenderer.vertices = postRenderVertices;
@@ -286,6 +290,26 @@ function start(gl){
 
 	postRenderScene = new Scene(gl);
 	postRenderScene.addObject(postRenderObject);
+
+	var final = new SceneObject(gl);
+	var finalRenderer = new Renderer(gl);
+	finalRenderer.vertices = postRenderVertices;
+	finalRenderer.colors = postRenderColors;
+	finalRenderer.uvs = postRenderUVs;
+	finalRenderer.triangles = postRenderIndexes;
+	finalRenderer.onChangePoints();
+	final.addComponent(finalRenderer);
+	finalRendererMaterial = new Material(gl);
+	final.addComponent(finalRendererMaterial);
+	finalRendererMaterial.load("blit.json", "shaders/program/", function(material, shader){
+		finalRendererMaterial.set("ProjMat", "matrix4x4", 16, postRenderMatrix.elements);
+		shader.onPreRender = function(scene, pool){
+			pool["DiffuseSampler"] = {name:"DiffuseSampler", type:gl.TEXTURE_2D,  value: swapBuffer.texture};
+		};
+	});
+
+	finalScene = new Scene(gl);
+	finalScene.addObject(final);
 
 	var tick = function() {
 		draw(gl);
@@ -362,14 +386,10 @@ function draw(gl) {
 	 */
 
 	if(currentShader != lastCurrentShader) {
-		postRenderScene.renderTo(null);
 		postRenderMaterial.clear();
 		postRenderMaterial.load(currentShader, "shaders/program/", function(material, shader){
-			var bias = new Matrix4();
-			bias.setScale(2.0, 2.0, 1.0);
-			bias.translate(-0.5,-0.5,0.0);
 
-			postRenderMaterial.set("ProjMat", "matrix4x4", 16, bias.elements);
+			postRenderMaterial.set("ProjMat", "matrix4x4", 16, postRenderMatrix.elements);
 
 			if(shader.program.u_InSize !== undefined)
 				postRenderMaterial.set("InSize", "float", 2, [currentFramebuffer.width, currentFramebuffer.height]);
@@ -379,9 +399,8 @@ function draw(gl) {
 
 			shader.onPreRender = function(scene, pool){
 				// Just in case needed
-
 				pool["DiffuseSampler"] = {name:"DiffuseSampler", type:gl.TEXTURE_2D,  value: currentFramebuffer.texture};
-				pool["LastFrameSampler"] = {name:"LastFrameSampler", type:gl.TEXTURE_2D,  value: lastFramebuffer.texture};
+				pool["PrevSampler"] = {name:"PrevSampler", type:gl.TEXTURE_2D,  value: lastFramebuffer.texture};
 
 				// Normal sampler generation
 				if(shader.u_NormalSampler != undefined){
@@ -392,18 +411,19 @@ function draw(gl) {
 				}
 			};
 		});
+
 		lastCurrentShader = currentShader;
 	}
 
 	if(currentShader != undefined) {
-		postRenderScene.bind();
-		postRenderScene.do("onRender", {});
-	}
+		postRenderScene.renderTo(swapBuffer);
+		postRenderScene.draw();
+		finalScene.draw();
 
-	// Exchange frames
-	var aux = currentFramebuffer;
-	currentFramebuffer = lastFramebuffer;
-	lastFramebuffer = aux;
+		var aux = lastFramebuffer;
+		lastFramebuffer = swapBuffer;
+		swapBuffer = aux;
+	}
 
 	// RESTORE MATRIX
 	cube.matrix.set(cubeBackup);
