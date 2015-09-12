@@ -283,12 +283,16 @@ function loadExternalShader(shaderName, shaderDir, callback){
 					shaderDir + s.vertex+".vsh",
 					shaderDir + s.fragment+".fsh",
 					function(program){
+						console.log("Shader "+shaderName+" loaded: OK");
 						s.program = program;
 						switchProgram(gl,s.program);
 
 						// Load the vars
 						doUniforms(s.uniforms, s.structs, function(n){ readUniformName(n, s.program); });
-						doUniformsNames(s.samplers, "sampler", function(n){ readUniformName(n, s.program); });
+						for(var sampler in s.samplers)
+							if(s.samplers[sampler].type === undefined)
+								s.samplers[sampler].type = "sampler2D";
+						doUniforms(s.samplers, s.structs, function(n){ readUniformName(n, s.program); });
 						doAttributes(s.attributes, function(n){ readAttributeName(n, s.program); });
 						doArrays(s.arrays, s.structs, function(n){ readUniformName(n, s.program); });
 
@@ -306,9 +310,10 @@ function loadExternalShader(shaderName, shaderDir, callback){
 
 
 function loadPostShader(shaderName){
-	loadExternalShader(shaderName, shaderDir, function(shader){
+	currentShader = shaderName;
+	/*loadExternalShader(shaderName, shaderDir, function(shader){
 		currentShader = shaders[shaderName];
-	});
+	});*/
 };
 
 function negative(v){

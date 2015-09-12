@@ -70,6 +70,11 @@ Material.prototype.load = function(shaderName, shaderPath, callback){
     });
 };
 
+Material.prototype.clear = function(){
+    this.ready = false;
+    this.shader = [];
+};
+
 /*Material.prototype.setDefault = function(uniformName, type, count, uniformValue){
   this.defaults[uniformName] = { "name": uniformName, "type": type, "count": count, values: uniformValue };
 };*/
@@ -131,10 +136,9 @@ function configureShaderUniforms(pool, program, gl, opt_material) {
 
     if (opt_material) {
         for (var s in opt_material.shader[opt_material.currentShader].samplers) {
-            var name = opt_material.shader[opt_material.currentShader].samplers[s];
-            if (!samplersSetted[name]) {
-                // TODO fix sampler cube detection
-                if (name.indexOf("Cube") != -1) {
+            var sampler = opt_material.shader[opt_material.currentShader].samplers[s];
+            if (!samplersSetted[sampler.name]) {
+                if (sampler.type == "samplerCube" || sampler.type == gl.TEXTURE_CUBE_MAP) {
                     if (textureCube === undefined) {
                         gl.activeTexture(glTextureIndex(this.gl, used));
                         gl.bindTexture(gl.TEXTURE_CUBE_MAP, Material.DefaultCubemap);
@@ -142,7 +146,7 @@ function configureShaderUniforms(pool, program, gl, opt_material) {
                         used++;
                     }
 
-                    gl.uniform1i(program["u_" + name], textureCube);
+                    gl.uniform1i(program["u_" + sampler.name], textureCube);
                 } else {
                     if (texture2D === undefined) {
                         gl.activeTexture(glTextureIndex(this.gl, used));
@@ -151,7 +155,7 @@ function configureShaderUniforms(pool, program, gl, opt_material) {
                         used++;
                     }
 
-                    gl.uniform1i(program["u_" + name], texture2D);
+                    gl.uniform1i(program["u_" + sampler.name], texture2D);
                 }
             }
         }

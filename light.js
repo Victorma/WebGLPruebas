@@ -199,7 +199,7 @@ Light.prototype.onPreRender = function(scene, uniformsPool, shader){
 
                 uniformsPool["ViewMatrix"] = { "type" : "matrix4x4", "count" : 16, "values" : this.view[i].elements };
 
-                scene.do("onRender", uniformsPool, this.program)
+                scene.do("onRender", uniformsPool, this.program);
                 //putImage(this.gl, "img"+(this.number + i), this.framebuffer[i].width, this.framebuffer[i].height);
             }
 

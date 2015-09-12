@@ -8,10 +8,10 @@
   "fragment": "Cell",
   "attributes": [ "Position", "Color", "Normal", "Uv" ],
   "samplers": [
-    "Shadows[0]",
-    "ShadowsCube[0]",
-    "Shadows[1]",
-    "ShadowsCube[1]"
+    { "name" : "Shadows[0]", "type" : "sampler2D"},
+    { "name" : "ShadowsCube[0]", "type" : "samplerCube" },
+    { "name" : "Shadows[1]", "type" : "sampler2D" },
+    { "name" : "ShadowsCube[1]", "type" : "samplerCube" }
   ],
   "uniforms": [
     { "name": "ProjMatrix", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },

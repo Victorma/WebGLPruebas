@@ -229,62 +229,25 @@ function start(gl){
 
 	scene.addObject(plane);
 
-	K3D.load("raptor.obj", function(data){
-		var m = K3D.parse.fromOBJ(data);	// done !
-		var sc = new SceneObject(gl);
-		var renderer = new Renderer(gl);
+	var raptor = new SceneObject(gl);
+	var raptorRenderer = new Renderer(gl);
+	raptorRenderer.loadObj("raptor.obj");
+	raptor.addComponent(raptorRenderer);
+	raptor.addComponent(toonMaterial);
+	raptor.setTranslate(2,1,0);
+	raptor.scale(0.01,0.01,0.01);
+	scene.addObject(raptor);
 
-		var ind = [];
-		for(var i=0; i<m.i_verts.length; i++) ind.push(i);
-		var colors = [];
-		for(var i=0; i<m.i_verts.length; i++){
-			colors.push(1.0); colors.push(1.0); colors.push(1.0); colors.push(1.0);
-		}
+	var head = new SceneObject(gl);
+	var headRenderer = new Renderer(gl);
+	headRenderer.loadObj("head.obj");
+	head.addComponent(headRenderer);
+	head.addComponent(toonMaterial);
+	head.setTranslate(0,0,0);
+	head.rotate(180, 0,1,0);
+	head.scale(0.01,0.01,0.01);
+	scene.addObject(head);
 
-		//	I need to index vertices and UVT with the same indices... 0, 1, 2, ...
-		renderer.vertices = new Float32Array(K3D.edit.unwrap(m.i_verts, m.c_verts, 3));
-		renderer.colors = new Float32Array(colors);
-		renderer.uvs = new Float32Array(K3D.edit.unwrap(m.i_uvt  , m.c_uvt  , 2));
-		renderer.normals = new Float32Array(K3D.edit.unwrap(m.i_norms  , m.c_norms  , 3));
-		renderer.triangles = new Uint16Array(ind);
-		renderer.onChangePoints(false);
-		sc.addComponent(renderer);
-		sc.addComponent(toonMaterial);
-		sc.setTranslate(2,1,0);
-		sc.scale(0.1,0.1,0.1);
-
-
-		scene.addObject(sc);
-	});
-
-	K3D.load("head.obj", function(data){
-		var m = K3D.parse.fromOBJ(data);	// done !
-		var sc = new SceneObject(gl);
-		var renderer = new Renderer(gl);
-
-		var ind = [];
-		for(var i=0; i<m.i_verts.length; i++) ind.push(i);
-		var colors = [];
-		for(var i=0; i<m.i_verts.length; i++){
-			colors.push(1.0); colors.push(1.0); colors.push(1.0); colors.push(1.0);
-		}
-
-		//	I need to index vertices and UVT with the same indices... 0, 1, 2, ...
-		renderer.vertices = new Float32Array(K3D.edit.unwrap(m.i_verts, m.c_verts, 3));
-		renderer.colors = new Float32Array(colors);
-		renderer.uvs = new Float32Array(K3D.edit.unwrap(m.i_uvt  , m.c_uvt  , 2));
-		renderer.normals = new Float32Array(K3D.edit.unwrap(m.i_norms  , m.c_norms  , 3));
-		renderer.triangles = new Uint16Array(ind);
-		renderer.onChangePoints(false);
-		sc.addComponent(renderer);
-		sc.addComponent(toonMaterial);
-		sc.setTranslate(0,0,0);
-		sc.rotate(180, 0,1,0);
-		sc.scale(0.1,0.1,0.1);
-
-
-		scene.addObject(sc);
-	});
 
 	// Register the event handler
 	currentAngle = [0.0, 0.0]; // [x-axis, y-axis] degrees
@@ -311,7 +274,7 @@ function start(gl){
 	]);
 
 	var postRenderObject = new SceneObject(gl);
-	var postRenderRenderer = new Renderer(gl, lightProgram);
+	var postRenderRenderer = new Renderer(gl);
 	postRenderRenderer.vertices = postRenderVertices;
 	postRenderRenderer.colors = postRenderColors;
 	postRenderRenderer.uvs = postRenderUVs;
@@ -345,29 +308,20 @@ var currentFramebuffer;
 
 var yawn = 0, pitched = 0;
 
+var lastCurrentShader = undefined;
+
 function draw(gl) {
 
 	/**
 	 * Camera management
 	 * */
 
-	if(Controller.w)
-		Camera.main.moveForward(0.1);
-
-	if(Controller.a)
-		Camera.main.moveLeft(0.1);
-
-	if(Controller.s)
-		Camera.main.moveBackwards(0.1);
-
-	if(Controller.d)
-		Camera.main.moveRight(0.1);
-
-	if(Controller.space)
-		Camera.main.moveUp(0.1);
-
-	if(Controller.shift)
-		Camera.main.moveDown(0.1);
+	if(Controller.w) Camera.main.moveForward(0.1);
+	if(Controller.a) Camera.main.moveLeft(0.1);
+	if(Controller.s) Camera.main.moveBackwards(0.1);
+	if(Controller.d) Camera.main.moveRight(0.1);
+	if(Controller.space) Camera.main.moveUp(0.1);
+	if(Controller.shift) Camera.main.moveDown(0.1);
 
 	var toYaw = currentAngle[1] - yawn;
 	var toPitch = currentAngle[0] - pitched;
@@ -380,7 +334,6 @@ function draw(gl) {
 		Camera.main.pitch(toPitch/3.0);
 		pitched += toPitch;
 	}
-
 
 	/**
 	 * Scene drawing
@@ -398,10 +351,9 @@ function draw(gl) {
 	positionalLightObject.setTranslate(Math.cos(ang)* 1.5, Math.sin(ang) * 1.5, 0);
 	positionalLight.onParametersChanged();
 
-	if(currentShader == null)
-		scene.renderTo(null);
-	else
-		scene.renderTo(currentFramebuffer);
+
+	if(currentShader == null) scene.renderTo(null);
+	else scene.renderTo(currentFramebuffer);
 
 	scene.draw();
 
@@ -409,71 +361,43 @@ function draw(gl) {
 	 * PostProcessing shader
 	 */
 
-	if(currentShader != null) {
+	if(currentShader != lastCurrentShader) {
+		postRenderScene.renderTo(null);
+		postRenderMaterial.clear();
+		postRenderMaterial.load(currentShader, "shaders/program/", function(material, shader){
+			var bias = new Matrix4();
+			bias.setScale(2.0, 2.0, 1.0);
+			bias.translate(-0.5,-0.5,0.0);
 
-		this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
-		this.gl.viewport(0, 0, canvas.width, canvas.height);
-		this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+			postRenderMaterial.set("ProjMat", "matrix4x4", 16, bias.elements);
 
-		switchProgram(gl,currentShader.program);
+			if(shader.program.u_InSize !== undefined)
+				postRenderMaterial.set("InSize", "float", 2, [currentFramebuffer.width, currentFramebuffer.height]);
 
-		for(var u in currentShader.uniforms){
-			var uni = currentShader.uniforms[u];
+			if(shader.program.u_OutSize !== undefined)
+				postRenderMaterial.set("OutSize", "float", 2, [1.0, 1.0]);
 
-			switch(uni.type){
-				case "matrix4x4":
-					gl.uniformMatrix4fv(currentShader.program["u_"+uni.name], false, uni.values);
-					break;
-				case "float":
-					gl["uniform"+ uni.count + "fv"](currentShader.program["u_"+uni.name],uni.values);
-					break;
-			}
-		}
+			shader.onPreRender = function(scene, pool){
+				// Just in case needed
 
-		this.gl.activeTexture(glTextureIndex(this.gl, 0));
-		this.gl.bindTexture(this.gl.TEXTURE_2D, currentFramebuffer.texture);
-		this.gl.uniform1i(currentShader.program.u_DiffuseSampler, 0);
+				pool["DiffuseSampler"] = {name:"DiffuseSampler", type:gl.TEXTURE_2D,  value: currentFramebuffer.texture};
+				pool["LastFrameSampler"] = {name:"LastFrameSampler", type:gl.TEXTURE_2D,  value: lastFramebuffer.texture};
 
-		if(currentShader.program.u_NormalSampler !== undefined){
+				// Normal sampler generation
+				if(shader.u_NormalSampler != undefined){
+					scene.renderTo(normalProgram.framebuffer);
+					scene.do("onRender",normalProgram);
+					scene.renderTo(currentFramebuffer);
+					pool["NormalSampler"] = {name:"NormalSampler", type:gl.TEXTURE_2D,  value: normalProgram.framebuffer.texture};
+				}
+			};
+		});
+		lastCurrentShader = currentShader;
+	}
 
-			switchProgram(gl,normalProgram);
-
-			gl.uniformMatrix4fv(normalProgram.u_ViewMatrix, false, Camera.main.view.elements);
-			gl.uniformMatrix4fv(normalProgram.u_ProjMatrix, false, Camera.main.projection.elements);
-
-			scene.renderTo(normalProgram.framebuffer);
-			scene.do("onRender",normalProgram);
-			scene.renderTo(null);
-			switchProgram(gl, currentShader.program);
-
-			this.gl.activeTexture(glTextureIndex(this.gl, 1));
-			this.gl.bindTexture(this.gl.TEXTURE_2D, normalProgram.framebuffer.texture);
-			this.gl.uniform1i(currentShader.program.u_NormalSampler, 1);
-		}
-
-		if(currentShader.program.u_PrevSampler !== undefined){
-			this.gl.activeTexture(glTextureIndex(this.gl, 1));
-			this.gl.bindTexture(this.gl.TEXTURE_2D, lastFramebuffer.texture);
-			this.gl.uniform1i(currentShader.program.u_PrevSampler, 1);
-		}
-
-
-
-		this.bias = new Matrix4();
-		this.bias.setIdentity();
-		this.bias.setScale(2.0, 2.0, 1.0);
-		this.bias.translate(-0.5,-0.5,0.0);
-
-		if(currentShader.program.u_ProjMat !== undefined)
-			gl.uniformMatrix4fv(currentShader.program.u_ProjMat, false, this.bias.elements);
-
-		if(currentShader.program.u_InSize !== undefined)
-			gl.uniform2f(currentShader.program.u_InSize , currentFramebuffer.width, currentFramebuffer.height);
-
-		if(currentShader.program.u_OutSize !== undefined)
-			gl.uniform2f(currentShader.program.u_OutSize , 1.0, 1.0);
-
-		postRenderScene.do("onRender", currentShader.program);
+	if(currentShader != undefined) {
+		postRenderScene.bind();
+		postRenderScene.do("onRender", {});
 	}
 
 	// Exchange frames

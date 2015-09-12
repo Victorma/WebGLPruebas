@@ -48,6 +48,30 @@ Renderer.prototype.onCreate = function(){
 	this.bufferTriangles = this.gl.createBuffer();
 };
 
+Renderer.prototype.loadObj = function(obj){
+	this.ready = false;
+	var renderer = this;
+
+	K3D.load(obj, function(data){
+		var m = K3D.parse.fromOBJ(data);
+
+		var ind = [];
+		for(var i=0; i<m.i_verts.length; i++) ind.push(i);
+		var colors = [];
+		for(var i=0; i<m.i_verts.length; i++){
+			colors.push(1.0); colors.push(1.0); colors.push(1.0); colors.push(1.0);
+		}
+
+		//	I need to index vertices and UVT with the same indices... 0, 1, 2, ...
+		renderer.vertices = new Float32Array(K3D.edit.unwrap(m.i_verts, m.c_verts, 3));
+		renderer.colors = new Float32Array(colors);
+		renderer.uvs = new Float32Array(K3D.edit.unwrap(m.i_uvt  , m.c_uvt  , 2));
+		renderer.normals = new Float32Array(K3D.edit.unwrap(m.i_norms  , m.c_norms  , 3));
+		renderer.triangles = new Uint16Array(ind);
+		renderer.onChangePoints(false);
+	});
+};
+
 /**
  * On Change points should be called when points are changed
  */
@@ -62,6 +86,7 @@ Renderer.prototype.onChangePoints = function(opt_normals){
 
 	if(opt_normals) this.regenerateNormals();
 	putBuffer(this.gl, this.gl.ARRAY_BUFFER, this.bufferNormals, this.normals, 3);
+	this.ready = true;
 };
 
 Renderer.prototype.regenerateNormals = function(){
@@ -109,6 +134,9 @@ Renderer.prototype.regenerateNormals = function(){
  */
 Renderer.prototype.onRender = function(scene, uniformsPool, shader){
 
+	if(!this.ready)
+		return;
+
 	var material = this.sceneObject.getComponent(Material);
 
 	var normalMatrix = new Matrix4();
@@ -133,10 +161,10 @@ Renderer.prototype.onRender = function(scene, uniformsPool, shader){
 			if(shader === undefined)
 				return;
 
+			materialShader.onPreRender(scene, uniformsPool);
 			material.configure(uniformsPool);
-			materialShader.onPreRender(scene);
 			this.draw(shader);
-			materialShader.onPostRender(scene);
+			materialShader.onPostRender(scene, uniformsPool);
 		}
 	}
 };
