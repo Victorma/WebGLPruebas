@@ -28,7 +28,6 @@ Scene.prototype.bind = function(){
 
     this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebuffer);
     this.gl.viewport(0, 0, width, height);
-    this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 };
 
 /**
@@ -42,11 +41,23 @@ Scene.prototype.draw = function(){
     pool["ViewMatrix"] = { "type" : "matrix4x4", "count" : 16, "values" : Camera.main.view.elements };
     pool["ProjMatrix"] = { "type" : "matrix4x4", "count" : 16, "values" : Camera.main.projection.elements };
 
+    //Skybox
+    /*if(Camera.main.skybox){
+        pool["SkyBox"] = { "type" : "matrix4x4", "count" : 16, "values" : Camera.main.skybox };
+        Camera.main.renderSkybox();
+    }*/
+
     // Prerender things
     this.do("onPreRender", pool);
 
     // Render things
     this.bind();
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+    //Skybox
+    if(Camera.main.skybox){
+        pool["SkyBox"] = { "name" : "Skybox", "type" : gl.TEXTURE_CUBE_MAP, "value" : Camera.main.skybox };
+        Camera.main.renderSkybox();
+    }
     this.do("onRender", pool);
 
     // PostRender things

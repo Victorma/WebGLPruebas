@@ -16,6 +16,15 @@ var cubeColors = new Float32Array([ // Vertex coordinates
 	 1.0, 0.0, 1.0, 1.0,	 1.0, 0.0, 1.0, 1.0,	1.0, 0.0, 1.0, 1.0, 	1.0, 0.0, 1.0, 1.0
 ]);
 
+var skyboxUVs = new Float32Array([ // Vertex coordinates
+	0.0, 0.0,	 1.0, 0.0,  1.0, 1.0,	0.0, 1.0,
+	0.0, 0.0,	 1.0, 0.0,  1.0, 1.0,	0.0, 1.0,
+	0.0, 0.0,	 1.0, 0.0,  1.0, 1.0,	0.0, 1.0,
+	0.0, 0.0,	 1.0, 0.0,  1.0, 1.0,	0.0, 1.0,
+	0.0, 0.0,	 1.0, 0.0,  1.0, 1.0,	0.0, 1.0,
+	0.0, 0.0,	 1.0, 0.0,  1.0, 1.0,	0.0, 1.0
+]);
+
 var cubeUVs = new Float32Array([ // Vertex coordinates
 	0.0, 0.0,	 1.0, 0.0,  1.0, 1.0,	0.0, 1.0,
 	0.0, 0.0,	 1.0, 0.0,  1.0, 1.0,	0.0, 1.0,
@@ -46,5 +55,20 @@ function createCube(gl, program){
 
 	sceneObject.addComponent(renderer);
 	
+	return sceneObject;
+};
+
+function createSkybox(gl){
+	var sceneObject = new SceneObject(gl);
+	var renderer = new Renderer(gl);
+
+	renderer.triangles = cubeIndexes;
+	renderer.vertices = cubeVertices;
+	renderer.colors = cubeColors;
+	renderer.uvs = cubeUVs;
+	renderer.onChangePoints();
+
+	sceneObject.addComponent(renderer);
+
 	return sceneObject;
 };

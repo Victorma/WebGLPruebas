@@ -36,6 +36,9 @@ uniform Light Lights[MAX_LIGHTS];
 varying vec3 ambient;
 varying vec4 v_PositionFromLight[MAX_LIGHTS];
 
+uniform int TextureEnabled;
+uniform int TextureMatrixEnabled;
+uniform sampler2D Texture;
 uniform sampler2D Shadows[MAX_LIGHTS];
 uniform samplerCube ShadowsCube[MAX_LIGHTS];
 
@@ -44,7 +47,8 @@ varying vec3 v_EyeDirection;
 varying vec3 v_Normal;
 varying vec4 v_Position;
 varying vec4 v_Color;
-varying vec4 v_Uv;
+varying vec2 v_Uv;
+varying vec4 v_UvProj;
 
 float unpack(vec4 rgbaDepth){
 	return rgbaDepth.r;
@@ -119,6 +123,17 @@ void main() {
 		}
 	}
 
-	gl_FragColor = vec4(ambient * v_Color.xyz + point, v_Color.a);
+	vec3 finalColor = v_Color.xyz;
+	if(TextureEnabled == 1){
+		if(TextureMatrixEnabled == 1){
+			vec3 texCoord = (v_UvProj.xyz / v_UvProj.w);
+			texCoord.y = 1.0-texCoord.y;
+			finalColor *= texture2D(Texture, texCoord.xy).xyz;
+		}
+		else
+			finalColor *= texture2D(Texture, v_Uv).xyz;
+	}
+
+	gl_FragColor = vec4(ambient * finalColor + point, v_Color.a);
 
 }

@@ -6,6 +6,7 @@ var Camera = function() {
     //Main matrices
     this.view = new Matrix4();
     this.projection = new Matrix4();
+    this.worldMatrix = new Matrix4();
 
     //Combined matrix
     this.pv = new Matrix4();
@@ -13,6 +14,7 @@ var Camera = function() {
     // Matrix initialization
     this.view.setIdentity();
     this.projection.setIdentity();
+    this.worldMatrix.setIdentity();
     this.pv.setIdentity();
 };
 
@@ -35,6 +37,38 @@ function solveCuadraticEcuation(a,b,c){
 
     return solutions;
 }
+
+Camera.prototype.setSkybox = function(texture){
+
+    this.auxScene = new Scene(gl);
+    this.skybox = createCube(gl);
+    var skyboxMaterial = new Material(gl);
+    skyboxMaterial.load("Skybox.json", "shaders/render/", function(material, shader){
+        shader.onPreRender = function(scene, pool){
+            pool["Skybox"] = { "name" : "Skybox", "type" : gl.TEXTURE_CUBE_MAP, "value" : texture };
+            pool["ViewMatrix"] = { "type" : "matrix4x4", "count" : 16, "values" : Camera.main.view.elements };
+            pool["ProjMatrix"] = { "type" : "matrix4x4", "count" : 16, "values" : Camera.main.projection.elements };
+            gl.disable(gl.DEPTH_TEST);
+        };
+        shader.onPostRender = function(scene, pool){
+            gl.enable(gl.DEPTH_TEST);
+        };
+    });
+    this.skybox.addComponent(skyboxMaterial);
+
+    var p = this.position.elements;
+    this.skybox.setTranslate(p[0],p[1],p[2]);
+    //this.skybox.scale(0.5,0.5,0.5);
+
+    this.auxScene.addObject(this.skybox);
+};
+
+Camera.prototype.renderSkybox = function(){
+
+    //this.skybox.setTranslate(2,2,2);
+    if(this.auxScene)
+        this.auxScene.do("onRender", {});
+};
 
 Camera.prototype.configureView = function(position, look, opt_up){
     if(opt_up === undefined){
@@ -68,6 +102,12 @@ Camera.prototype.configureView = function(position, look, opt_up){
 
     this.view.setLookAt(p[0], p[1], p[2], l[0], l[1], l[2], u[0], u[1], u[2]);
     this.pv = new Matrix4(this.projection).multiply(new Matrix4(this.view));
+
+    compose(this.worldMatrix, this.position, getQuaternion(this.view), new Vector3([1.0,1.0,1.0]));
+
+    if(this.skybox)
+        this.skybox.setTranslate(p[0],p[1],p[2]);
+
 };
 
 Camera.prototype.configureViewCoords = function(px, py, pz, lx, ly, lz, ux, uy, uz){

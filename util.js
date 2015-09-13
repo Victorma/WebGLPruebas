@@ -270,9 +270,60 @@ function findStruct(name, structs){
 	return undefined;
 }
 
+function loadTexture(url, callback) {
+	texture = gl.createTexture();
+	image = new Image();
+	image.onload = function() {
+		gl.bindTexture(gl.TEXTURE_2D, texture);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
+		gl.generateMipmap(gl.TEXTURE_2D);
+		gl.bindTexture(gl.TEXTURE_2D, null);
+		callback(texture);
+	};
+	image.src = url;
+}
+
+function loadCubeFace(face, glIndex, texture, callback){
+	var f = new Image();
+	f.onload = function () {
+		gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
+		gl.texImage2D(glIndex, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, f);
+		callback(face);
+	};
+	f.src = face;
+}
+
+function loadTextureCube(left, right, top, bottom, front, back, callback) {
+	texture = gl.createTexture();
+	gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
+	gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+	gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+	var faces = [left, right, top, bottom, front, back];
+	var completed = 0;
+
+	for(var face = 0; face < 6; face++){
+		if(faces[face])
+			loadCubeFace(faces[face], gl.TEXTURE_CUBE_MAP_POSITIVE_X + face, texture, function(name){
+				completed++;
+				if(completed == 6)
+					callback(texture);
+			});
+		else{
+			completed++;
+			if(completed == 6)
+				callback(texture);
+		}
+	}
+}
+
+
+
 
 function loadExternalShader(shaderName, shaderDir, callback){
-	if(shaders[shaderName] === undefined) {
+	if(true/*shaders[shaderName] === undefined*/) {
 		// lets load
 		var request = new XMLHttpRequest();
 		request.onreadystatechange = function() {
@@ -364,3 +415,162 @@ function vect(u,v){
 
 	return productoEscalar(eu,ev);
 };
+
+function setMatrixRotationFromQuaternion(matrix, quaternion) {
+	/*var q = quaternion.elements;
+	var m = matrix.elements;
+
+	var x = q[0], y = q[1], z = q[2], w = q[3];
+	//  var g = c + c, h = d + d, k = e + e, a = c * g;
+	var x2 = x + x, y2 = y + y, z2 = z + z;
+
+	var l = x * y2,
+		p = y * y2,
+		a = x2 * x,
+		c = x * z2,
+		d = y * z2,
+		e = z * z2,
+		g = w * a,
+		h = w * y2,
+		f = w * z2;
+
+	m[0] = 1 - (p + e);
+	m[4] = l - f;
+	m[8] = c + h;
+	m[1] = l + f;
+	m[5] = 1 - (a + e);
+	m[9] = d - g;
+	m[2] = c - h;
+	m[6] = d + g;
+	m[10] = 1 - (a + p);
+	m[3] = 0;
+	m[7] = 0;
+	m[11] = 0;
+	m[12] = 0;
+	m[13] = 0;
+	m[14] = 0;
+	m[15] = 1;*/
+	var q = quaternion.elements;
+	var b = matrix.elements, c = q[0], d = q[1], e = q[2], f = q[3], g = c + c, h = d + d, k = e + e;
+	a = c * g;
+	var l = c * h, c = c * k, p = d * h, d = d * k, e = e * k, g = f * g, h = f * h, f = f * k;
+	b[0] = 1 - (p + e);
+	b[4] = l - f;
+	b[8] = c + h;
+	b[1] = l + f;
+	b[5] = 1 - (a + e);
+	b[9] = d - g;
+	b[2] = c - h;
+	b[6] = d + g;
+	b[10] = 1 - (a + p);
+	b[3] = 0;
+	b[7] = 0;
+	b[11] = 0;
+	b[12] = 0;
+	b[13] = 0;
+	b[14] = 0;
+	b[15] = 1;
+
+};
+
+function extractRotation(from, to){
+	var c = to.elements,
+		b = from.elements;
+
+	var d = 1 / length(new Vector3([b[0], b[1], b[2]])),
+		e = 1 / length(new Vector3([b[4], b[5], b[6]])),
+		f = 1 / length(new Vector3([b[8], b[9], b[10]]));
+
+	c[0] = b[0] * d;
+	c[1] = b[1] * d;
+	c[2] = b[2] * d;
+	c[4] = b[4] * e;
+	c[5] = b[5] * e;
+	c[6] = b[6] * e;
+	c[8] = b[8] * f;
+	c[9] = b[9] * f;
+	c[10] = b[10] * f;
+}
+
+function dot(vector1, vector2){
+	var v1 = vector1.elements,
+		v2 = vector2.elements;
+
+	return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2];
+}
+
+function reflect(vector, normal){
+	var i = vector.elements,
+		n = normal.elements;
+
+	var s = 2*dot(vector, normal);
+	var f = mult(normal, s);
+
+	return dif(vector, f);
+}
+
+function getPositionFromMatrix(matrix){
+	var a = matrix.elements;
+	return new Vector3([a[12], a[13], a[14]]);
+}
+
+function setPosition (matrix, position) {
+	var b = matrix.elements;
+	var a = position.elements;
+	b[12] = a[0];
+	b[13] = a[1];
+	b[14] = a[2];
+};
+
+function compose(matrix, position, rotationQuaternion, scale){
+	setMatrixRotationFromQuaternion(matrix, rotationQuaternion);
+	matrix.scale(scale.elements[0], scale.elements[1], scale.elements[2]);
+	setPosition(matrix, position);
+	return matrix;
+};
+
+function getQuaternion (matrix) {
+	/*var c = ae[0], a = ae[4], d = ae[8], e = ae[1], f = ae[5],
+		g = ae[9], h = ae[2], k = ae[6], b = ae[10], l = c + f + b;
+
+	var _w, _x, _y, _z;
+
+	if(0 < l){
+		c = .5 / Math.sqrt(l + 1);
+		_w = .25 / c;
+		_x = (k - g) * c;
+		_y = (d - h) * c;
+		_z = (e - a) * c;
+	}else{
+		if(c > f && c > b ) {
+			c = 2 * Math.sqrt(1 + c - f - b);
+			_w = (k - g) / c;
+			_x = .25 * c;
+			_y = (a + e) / c;
+			_z = (d + h) / c;
+		}else{
+			if(f > b){
+				c = 2 * Math.sqrt(1 + f - c - b);
+				_w = (d - h) / c;
+				_x = (a + e) / c;
+				_y = .25 * c;
+				_z = (g + k) / c
+			}else{
+				c = 2 * Math.sqrt(1 + b - c - f);
+				_w = (e - a) / c;
+				_x = (d + h) / c;
+				_y = (g + k) / c;
+				_z = .25 * c;
+			}
+		}*/
+
+
+
+	var b = matrix.elements, c = b[0], _x, _y,_z,_w;
+	a = b[4];
+	var d = b[8], e = b[1], f = b[5], g = b[9], h = b[2], k = b[6], b = b[10], l = c + f + b;
+	0 < l ? (c = .5 / Math.sqrt(l + 1), _w = .25 / c, _x = (k - g) * c, _y = (d - h) * c, _z = (e - a) * c) : c > f && c > b ? (c = 2 * Math.sqrt(1 + c - f - b), _w = (k - g) / c, _x = .25 * c, _y = (a + e) / c, _z = (d + h) / c) : f > b ? (c = 2 * Math.sqrt(1 + f - c - b), _w = (d - h) / c, _x = (a + e) / c, _y = .25 * c, _z = (g + k) / c) : (c = 2 * Math.sqrt(1 + b - c - f), _w = (e - a) / c, _x = (d + h) / c, _y = (g + k) / c, _z = .25 * c);
+
+
+	return new Vector4([_x,_y,_z,_w]);
+}

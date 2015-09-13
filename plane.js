@@ -2,7 +2,7 @@
  * Created by Victorma on 05/08/2015.
  */
 var planeVertices = new Float32Array([ // Vertex coordinates
-    -1.0, 0.0,-1.0, 	 1.0, 0.0,-1.0, 	 1.0, 0.0, 1.0,	 -1.0, 0.0, 1.0
+    -10.0, -10.0, 0.0, 	 10.0, -10.0, 0.0, 	 10.0, 10.0,0.0,	 -10.0, 10.0, 0.0
 ]);
 
 var planeColors = new Float32Array([ // Vertex coordinates

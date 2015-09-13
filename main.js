@@ -138,8 +138,8 @@ function start(gl){
 	 * Camera and projection
 	 */
 
-	Camera.main.configureView(new Vector3([-3,13,-13]), new Vector3([0,0,0]));
-	Camera.main.configureProjection(false, canvas.width,canvas.height, 1, 100, 30);
+	Camera.main.configureView(new Vector3([3,4,13]), new Vector3([0,0,0]));
+	Camera.main.configureProjection(false, canvas.width,canvas.height, 0.1, 100, 30);
 
 	/**
 	 * Scene creation
@@ -156,7 +156,7 @@ function start(gl){
 		directionalLight.direction.elements[1],
 		directionalLight.direction.elements[2]);
 	directionalLight.color = new Vector3([0.1, 0.1, 0.1]);
-	directionalLight.casts = 0;
+	directionalLight.casts = 1;
 	directionalLightObject.addComponent(directionalLight);
 	directionalLight.onParametersChanged();
 	scene.addObject(directionalLightObject);
@@ -167,7 +167,7 @@ function start(gl){
 	positionalLight.type = 2;
 	positionalLightObject.setTranslate(LIGHT_X, LIGHT_Y, LIGHT_Z);
 	positionalLight.color = new Vector3([0.8, 0.4, 0.4]);
-	positionalLight.casts = 0;
+	positionalLight.casts = 1;
 	positionalLightObject.addComponent(positionalLight);
 	positionalLight.onParametersChanged();
 	scene.addObject(positionalLightObject);
@@ -175,6 +175,25 @@ function start(gl){
 	var lightMaterial = new Material(gl);
 	lightMaterial.load("Point.json", "shaders/render/", function(){
 		lightMaterial.set("AmbientLight", "float", 3, [0.15, 0.15, 0.15]);
+	});
+	/*
+	 "textures/emerald_left.jpg",
+	 "textures/emerald_right.jpg",
+	 "textures/emerald_top.jpg",
+	 "textures/emerald_top.jpg",
+	 "textures/emerald_front.jpg",
+	 "textures/emerald_back.jpg",
+	 */
+
+	loadTextureCube(
+		"textures/skybox_px.jpg",
+		"textures/skybox_nx.jpg",
+		"textures/skybox_py.jpg",
+		"textures/skybox_ny.jpg",
+		"textures/skybox_pz.jpg",
+		"textures/skybox_nz.jpg",
+		function(texture){
+			Camera.main.setSkybox(texture);
 	});
 
 	var toonMaterial = new Material(gl);
@@ -223,9 +242,114 @@ function start(gl){
 	scene.addObject(cube4);
 	// Plane
 	plane = createPlane(gl);
-	plane.setTranslate(-1,-1,0.0);
-	plane.scale(10.0,1.0,10.0);
-	plane.addComponent(lightMaterial);
+	plane.setTranslate(0,-2,0);
+	plane.rotate(90,1,0,0);
+	plane.translate(0,0,0);
+	//plane.scale(10.0,1.0,10.0);
+	var mirrorMaterial = new Material(gl);
+	mirrorMaterial.load("Point.json", "shaders/render/", function(material, shader){
+		mirrorMaterial.set("AmbientLight", "float", 3, [0.5, 0.5, 0.5]);
+		var reflectionBuffer = initFramebufferObject(gl, canvas.width, canvas.height)[0];
+		var textureMatrix = new Matrix4();
+		mirrorMaterial.onPreRender = function(scene, pool){
+			// Avoid paint this material
+			//mirrorMaterial.ready = false;
+			mirrorMaterial.noMirror = true;
+			var bcPosition = Camera.main.position,
+				bcLook = Camera.main.look,
+				bcUp = Camera.main.up;
+
+			var oldView = new Matrix4(  );
+
+			// Update the texture matrix
+			textureMatrix.set({elements:
+				[ 0.5, 0.0, 0.0, 0.0,
+					0.0, 0.5, 0.0, 0.0,
+					0.0, 0.0, 0.5, 0.0,
+					0.5, 0.5, 0.5, 1.0 ]} );
+			textureMatrix.multiply(new Matrix4(Camera.main.projection).multiply(new Matrix4(Camera.main.view)));
+
+			this.matrixWorld = scene.peekMatrix();
+
+			this.mirrorWorldPosition = getPositionFromMatrix( this.matrixWorld );
+			this.cameraWorldPosition = getPositionFromMatrix( Camera.main.worldMatrix );
+
+			this.rotationMatrix = new Matrix4();
+			extractRotation( this.matrixWorld, this.rotationMatrix );
+
+			var n = new Vector4([ 0, 0, 1, 0]);
+			var n3e = this.rotationMatrix.multiplyVector4(n).elements;
+			this.normal = normalize(new Vector3([n3e[0],-n3e[1],n3e[2]]));
+			//console.log("mirrorPos: " + this.mirrorWorldPosition.elements);
+			//console.log("normal: " + this.normal.elements);
+			//console.log("reflect: " + reflect(new Vector3([0,-1,-1]), new Vector3( [0,1,0])).elements);
+
+			var view = dif(this.mirrorWorldPosition, this.cameraWorldPosition );
+			view = sum(negative(reflect(view,this.normal)),this.mirrorWorldPosition );
+			//console.log("view: " + view.elements);
+
+			extractRotation( Camera.main.worldMatrix, this.rotationMatrix );
+			//console.log("rotationMatrix: " + this.rotationMatrix.elements);
+
+			var lp = new Vector4([ 0, 0, -1, 0]);
+			var lp3e = this.rotationMatrix.multiplyVector4(lp).elements;
+			var lookAtPosition = new Vector3([-lp3e[0],-lp3e[1],lp3e[2]]);
+			var myLook = normalize(dif(Camera.main.position,Camera.main.look));
+
+			//console.log("lookAtPosition: " + lookAtPosition.elements + " myLook: " + myLook.elements);
+
+			this.lookAtPosition = sum(this.cameraWorldPosition, lookAtPosition);
+			var target = sum(negative(reflect(dif(this.mirrorWorldPosition, this.lookAtPosition), this.normal)), this.mirrorWorldPosition);
+			//console.log("target: " + target.elements);
+
+			var u = new Vector4([ 0, -1, 0, 0]);
+			var u3e = this.rotationMatrix.multiplyVector4(u).elements;
+			var up = new Vector3([u3e[0],-u3e[1],u3e[2]]);
+
+			this.up = negative(reflect(up, this.normal));
+
+			//console.log(  "up : " + this.up.elements + "(old: "+ bcUp.elements+")");
+
+
+			Camera.main.configureView(view, target, this.up);
+
+
+
+			var bcBuffer = scene.framebuffer;
+			scene.renderTo(reflectionBuffer);
+			scene.bind();
+			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+			var renderer = plane.getComponent(Renderer);
+			renderer.ready = false;
+
+			Camera.main.renderSkybox();
+			scene.do("onRender", pool);
+			renderer.ready = true;
+			//putImage(gl, "img1", reflectionBuffer.width, reflectionBuffer.height);
+
+			// Restore status
+			scene.renderTo(bcBuffer);
+			scene.bind();
+			Camera.main.configureView(bcPosition, bcLook, bcUp);
+			//mirrorMaterial.ready = true;
+			mirrorMaterial.noMirror = false;
+		};
+		shader.onPreRender = function(scene, pool){
+			// ConfigureUniforms
+			if(!mirrorMaterial.noMirror) {
+				pool["TextureEnabled"] = {type: "int", count: 1, values: [1]};
+				pool["Texture"] = {type: gl.TEXTURE_2D, value: reflectionBuffer.texture};
+				mirrorMaterial.set("TextureMatrixEnabled", "int", 1, [1]);
+				mirrorMaterial.set("TextureMatrix", "matrix4x4", 16, textureMatrix.elements);
+			}
+		};
+		shader.onPostRender = function(scene, pool){
+			delete pool["TextureEnabled"];
+			delete pool["Texture"];
+		};
+	});
+
+	plane.addComponent(mirrorMaterial);
 
 	scene.addObject(plane);
 
@@ -233,7 +357,22 @@ function start(gl){
 	var raptorRenderer = new Renderer(gl);
 	raptorRenderer.loadObj("raptor.obj");
 	raptor.addComponent(raptorRenderer);
-	raptor.addComponent(toonMaterial);
+
+	var raptorMaterial = new Material(gl);
+	raptorMaterial.load("Point.json", "shaders/render/", function(material, shader){
+		raptorMaterial.set("AmbientLight", "float", 3, [0.5, 0.5, 0.5]);
+		loadTexture("raptor.jpg",function(texture){
+			shader.onPreRender = function(scene, pool){
+				pool["TextureEnabled"] = {name:"Texture", type: "int", count: 1,  values: [ 1 ]};
+				pool["Texture"] = {name:"Texture", type:gl.TEXTURE_2D,  value: texture};
+			};
+			shader.onPostRender = function(scene, pool){
+				delete pool["TextureEnabled"];
+				delete pool["Texture"];
+			};
+		});
+	});
+	raptor.addComponent(raptorMaterial);
 	raptor.setTranslate(2,1,0);
 	raptor.scale(0.01,0.01,0.01);
 	scene.addObject(raptor);
@@ -243,9 +382,9 @@ function start(gl){
 	headRenderer.loadObj("head.obj");
 	head.addComponent(headRenderer);
 	head.addComponent(toonMaterial);
-	head.setTranslate(0,0,0);
+	head.setTranslate(-3,-1,0);
 	head.rotate(180, 0,1,0);
-	head.scale(0.01,0.01,0.01);
+	head.scale(0.03,0.03,0.03);
 	scene.addObject(head);
 
 
@@ -351,11 +490,11 @@ function draw(gl) {
 	var toPitch = currentAngle[0] - pitched;
 
 	if(toYaw!=0){
-		Camera.main.yaw(toYaw/3.0);
+		Camera.main.yaw(toYaw/2.0);
 		yawn += toYaw;
 	}
 	if(toPitch!=0) {
-		Camera.main.pitch(toPitch/3.0);
+		Camera.main.pitch(toPitch/2.0);
 		pitched += toPitch;
 	}
 

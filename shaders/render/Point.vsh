@@ -6,6 +6,9 @@ uniform mat4 ViewMatrix;
 uniform mat4 ProjMatrix;
 uniform mat4 NormalMatrix;
 
+uniform int TextureMatrixEnabled;
+uniform mat4 TextureMatrix;
+
 // All lights
 #define MAX_LIGHTS 2
 
@@ -43,7 +46,7 @@ uniform vec3 AmbientLight;
 attribute vec4 Position;
 attribute vec4 Normal;
 attribute vec4 Color;
-attribute vec4 Uv;
+attribute vec2 Uv;
 
 varying vec3 ambient;
 varying vec4 v_PositionFromLight[MAX_LIGHTS];
@@ -51,10 +54,9 @@ varying vec4 v_PositionFromLight[MAX_LIGHTS];
 varying vec3 v_Normal;
 varying vec4 v_Position;
 varying vec4 v_Color;
-varying vec4 v_Uv;
+varying vec2 v_Uv;
+varying vec4 v_UvProj;
 varying vec3 v_EyeDirection;
-
-
 
 void main() {
 	// Vertex position
@@ -78,6 +80,9 @@ void main() {
     ambient = AmbientLight * Color.xyz;
 
 	v_Color = Color;
-	v_Uv = Uv;
+	if(TextureMatrixEnabled == 1){
+		v_UvProj = TextureMatrix * v_Position;
+	}else
+		v_Uv = Uv;
 	gl_PointSize = 1.0;
 }
