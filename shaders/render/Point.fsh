@@ -127,7 +127,8 @@ void main() {
 	if(TextureEnabled == 1){
 		if(TextureMatrixEnabled == 1){
 			vec3 texCoord = (v_UvProj.xyz / v_UvProj.w);
-			texCoord.y = 1.0-texCoord.y;
+			texCoord.x = 1.0-texCoord.x;
+			//texCoord.y = 1.0-texCoord.y;
 			finalColor *= texture2D(Texture, texCoord.xy).xyz;
 		}
 		else

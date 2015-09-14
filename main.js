@@ -251,88 +251,49 @@ function start(gl){
 		mirrorMaterial.set("AmbientLight", "float", 3, [0.5, 0.5, 0.5]);
 		var reflectionBuffer = initFramebufferObject(gl, canvas.width, canvas.height)[0];
 		var textureMatrix = new Matrix4();
+		var rotationMatrix = new Matrix4();
 		mirrorMaterial.onPreRender = function(scene, pool){
-			// Avoid paint this material
-			//mirrorMaterial.ready = false;
-			mirrorMaterial.noMirror = true;
-			var bcPosition = Camera.main.position,
-				bcLook = Camera.main.look,
-				bcUp = Camera.main.up;
-
-			var oldView = new Matrix4(  );
+			// Backups
+			var bcPosition = Camera.main.position, bcLook = Camera.main.look, bcUp = Camera.main.up, bcBuffer = scene.framebuffer;
 
 			// Update the texture matrix
-			textureMatrix.set({elements:
-				[ 0.5, 0.0, 0.0, 0.0,
-					0.0, 0.5, 0.0, 0.0,
-					0.0, 0.0, 0.5, 0.0,
-					0.5, 0.5, 0.5, 1.0 ]} );
+			textureMatrix.set({elements:[ 0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0,0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0 ]} );
 			textureMatrix.multiply(new Matrix4(Camera.main.projection).multiply(new Matrix4(Camera.main.view)));
 
-			this.matrixWorld = scene.peekMatrix();
-
-			this.mirrorWorldPosition = getPositionFromMatrix( this.matrixWorld );
+			this.mirrorWorldPosition = getPositionFromMatrix( scene.peekMatrix() );
 			this.cameraWorldPosition = getPositionFromMatrix( Camera.main.worldMatrix );
 
-			this.rotationMatrix = new Matrix4();
-			extractRotation( this.matrixWorld, this.rotationMatrix );
+			// NORMAL
+			extractRotation( scene.peekMatrix(), rotationMatrix ).invert();
+			var n3e = rotationMatrix.multiplyVector4(new Vector4([ 0, 0, 1, 0])).elements;
+			var normal = normalize(new Vector3([n3e[0],n3e[1],n3e[2]]));
+			// POSITION
+			var position = sum(negative(reflect(dif(this.mirrorWorldPosition, this.cameraWorldPosition ),normal)), this.mirrorWorldPosition );
+			// LOOK
+			extractRotation( Camera.main.worldMatrix, rotationMatrix ).invert();
+			var lv = rotationMatrix.multiplyVector4(new Vector4([ 0, 0, -1, 0])).elements;
+			var lookVect = sum(this.cameraWorldPosition, new Vector3([lv[0],lv[1],lv[2]]));
+			var look = sum(negative(reflect(dif(this.mirrorWorldPosition, lookVect), normal)), this.mirrorWorldPosition);
+			// UP
+			var ue = rotationMatrix.multiplyVector4(new Vector4([ 0, -1, 0, 0])).elements;
+			var up = negative(reflect(new Vector3([ue[0],ue[1],ue[2]]), normal));
+			// UPDATE CAMERA
+			Camera.main.configureView(position, look, up);
 
-			var n = new Vector4([ 0, 0, 1, 0]);
-			var n3e = this.rotationMatrix.multiplyVector4(n).elements;
-			this.normal = normalize(new Vector3([n3e[0],-n3e[1],n3e[2]]));
-			//console.log("mirrorPos: " + this.mirrorWorldPosition.elements);
-			//console.log("normal: " + this.normal.elements);
-			//console.log("reflect: " + reflect(new Vector3([0,-1,-1]), new Vector3( [0,1,0])).elements);
-
-			var view = dif(this.mirrorWorldPosition, this.cameraWorldPosition );
-			view = sum(negative(reflect(view,this.normal)),this.mirrorWorldPosition );
-			//console.log("view: " + view.elements);
-
-			extractRotation( Camera.main.worldMatrix, this.rotationMatrix );
-			//console.log("rotationMatrix: " + this.rotationMatrix.elements);
-
-			var lp = new Vector4([ 0, 0, -1, 0]);
-			var lp3e = this.rotationMatrix.multiplyVector4(lp).elements;
-			var lookAtPosition = new Vector3([-lp3e[0],-lp3e[1],lp3e[2]]);
-			var myLook = normalize(dif(Camera.main.position,Camera.main.look));
-
-			//console.log("lookAtPosition: " + lookAtPosition.elements + " myLook: " + myLook.elements);
-
-			this.lookAtPosition = sum(this.cameraWorldPosition, lookAtPosition);
-			var target = sum(negative(reflect(dif(this.mirrorWorldPosition, this.lookAtPosition), this.normal)), this.mirrorWorldPosition);
-			//console.log("target: " + target.elements);
-
-			var u = new Vector4([ 0, -1, 0, 0]);
-			var u3e = this.rotationMatrix.multiplyVector4(u).elements;
-			var up = new Vector3([u3e[0],-u3e[1],u3e[2]]);
-
-			this.up = negative(reflect(up, this.normal));
-
-			//console.log(  "up : " + this.up.elements + "(old: "+ bcUp.elements+")");
-
-
-			Camera.main.configureView(view, target, this.up);
-
-
-
-			var bcBuffer = scene.framebuffer;
+			// Setup framebuffer & clean
 			scene.renderTo(reflectionBuffer);
-			scene.bind();
-			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-			var renderer = plane.getComponent(Renderer);
-			renderer.ready = false;
+			scene.bind(); gl.clear(gl.DEPTH_BUFFER_BIT);
 
+			// culling face to avoid mirror seen
+			gl.enable(gl.CULL_FACE); gl.cullFace(gl.FRONT);
 			Camera.main.renderSkybox();
 			scene.do("onRender", pool);
-			renderer.ready = true;
-			//putImage(gl, "img1", reflectionBuffer.width, reflectionBuffer.height);
+			gl.disable(gl.CULL_FACE);
 
 			// Restore status
 			scene.renderTo(bcBuffer);
 			scene.bind();
 			Camera.main.configureView(bcPosition, bcLook, bcUp);
-			//mirrorMaterial.ready = true;
-			mirrorMaterial.noMirror = false;
 		};
 		shader.onPreRender = function(scene, pool){
 			// ConfigureUniforms

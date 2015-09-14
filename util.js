@@ -490,6 +490,8 @@ function extractRotation(from, to){
 	c[8] = b[8] * f;
 	c[9] = b[9] * f;
 	c[10] = b[10] * f;
+
+	return to;
 }
 
 function dot(vector1, vector2){
