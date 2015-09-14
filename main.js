@@ -139,7 +139,7 @@ function start(gl){
 	 */
 
 	Camera.main.configureView(new Vector3([3,4,13]), new Vector3([0,0,0]));
-	Camera.main.configureProjection(false, canvas.width,canvas.height, 0.1, 100, 30);
+	Camera.main.configureProjection(false, canvas.width,canvas.height, 0.1, 100, 120);
 
 	/**
 	 * Scene creation
@@ -181,8 +181,9 @@ function start(gl){
 	 "textures/emerald_right.jpg",
 	 "textures/emerald_top.jpg",
 	 "textures/emerald_top.jpg",
-	 "textures/emerald_front.jpg",
 	 "textures/emerald_back.jpg",
+	 "textures/emerald_front.jpg",
+
 	 */
 
 	loadTextureCube(
@@ -285,8 +286,8 @@ function start(gl){
 			scene.bind(); gl.clear(gl.DEPTH_BUFFER_BIT);
 
 			// culling face to avoid mirror seen
-			gl.enable(gl.CULL_FACE); gl.cullFace(gl.FRONT);
 			Camera.main.renderSkybox();
+			gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
 			scene.do("onRender", pool);
 			gl.disable(gl.CULL_FACE);
 
@@ -296,8 +297,7 @@ function start(gl){
 			Camera.main.configureView(bcPosition, bcLook, bcUp);
 		};
 		shader.onPreRender = function(scene, pool){
-			// ConfigureUniforms
-			if(!mirrorMaterial.noMirror) {
+			if(reflectionBuffer != scene.framebuffer) {
 				pool["TextureEnabled"] = {type: "int", count: 1, values: [1]};
 				pool["Texture"] = {type: gl.TEXTURE_2D, value: reflectionBuffer.texture};
 				mirrorMaterial.set("TextureMatrixEnabled", "int", 1, [1]);
@@ -311,8 +311,79 @@ function start(gl){
 	});
 
 	plane.addComponent(mirrorMaterial);
-
 	scene.addObject(plane);
+
+	plane2 = createPlane(gl);
+	plane2.setTranslate(0,10,-10);
+	plane2.rotate(180, 0,1,0);
+	plane2.scale(0.5,0.5,0.5);
+	//plane.scale(10.0,1.0,10.0);
+	var mirrorMaterial2 = new Material(gl);
+	mirrorMaterial2.load("Point.json", "shaders/render/", function(material, shader){
+		mirrorMaterial2.set("AmbientLight", "float", 3, [0.5, 0.5, 0.5]);
+		var reflectionBuffer = initFramebufferObject(gl, canvas.width, canvas.height)[0];
+		var textureMatrix = new Matrix4();
+		var rotationMatrix = new Matrix4();
+		mirrorMaterial2.onPreRender = function(scene, pool){
+			// Backups
+			var bcPosition = Camera.main.position, bcLook = Camera.main.look, bcUp = Camera.main.up, bcBuffer = scene.framebuffer;
+
+			// Update the texture matrix
+			textureMatrix.set({elements:[ 0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0,0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0 ]} );
+			textureMatrix.multiply(new Matrix4(Camera.main.projection).multiply(new Matrix4(Camera.main.view)));
+
+			this.mirrorWorldPosition = getPositionFromMatrix( scene.peekMatrix() );
+			this.cameraWorldPosition = getPositionFromMatrix( Camera.main.worldMatrix );
+
+			// NORMAL
+			extractRotation( scene.peekMatrix(), rotationMatrix ).invert();
+			var n3e = rotationMatrix.multiplyVector4(new Vector4([ 0, 0, 1, 0])).elements;
+			var normal = normalize(new Vector3([n3e[0],n3e[1],n3e[2]]));
+			// POSITION
+			var position = sum(negative(reflect(dif(this.mirrorWorldPosition, this.cameraWorldPosition ),normal)), this.mirrorWorldPosition );
+			// LOOK
+			extractRotation( Camera.main.worldMatrix, rotationMatrix ).invert();
+			var lv = rotationMatrix.multiplyVector4(new Vector4([ 0, 0, -1, 0])).elements;
+			var lookVect = sum(this.cameraWorldPosition, new Vector3([lv[0],lv[1],lv[2]]));
+			var look = sum(negative(reflect(dif(this.mirrorWorldPosition, lookVect), normal)), this.mirrorWorldPosition);
+			// UP
+			var ue = rotationMatrix.multiplyVector4(new Vector4([ 0, -1, 0, 0])).elements;
+			var up = negative(reflect(new Vector3([ue[0],ue[1],ue[2]]), normal));
+			// UPDATE CAMERA
+			Camera.main.configureView(position, look, up);
+
+			// Setup framebuffer & clean
+			scene.renderTo(reflectionBuffer);
+			scene.bind(); gl.clear(gl.DEPTH_BUFFER_BIT);
+
+			// culling face to avoid mirror seen
+			Camera.main.renderSkybox();
+			gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
+			scene.do("onRender", pool);
+			gl.disable(gl.CULL_FACE);
+
+			// Restore status
+			scene.renderTo(bcBuffer);
+			scene.bind();
+			Camera.main.configureView(bcPosition, bcLook, bcUp);
+		};
+		shader.onPreRender = function(scene, pool){
+			if(reflectionBuffer != scene.framebuffer) {
+				pool["TextureEnabled"] = {type: "int", count: 1, values: [1]};
+				pool["Texture"] = {type: gl.TEXTURE_2D, value: reflectionBuffer.texture};
+				mirrorMaterial2.set("TextureMatrixEnabled", "int", 1, [1]);
+				mirrorMaterial2.set("TextureMatrix", "matrix4x4", 16, textureMatrix.elements);
+			}
+		};
+		shader.onPostRender = function(scene, pool){
+			delete pool["TextureEnabled"];
+			delete pool["Texture"];
+		};
+	});
+
+	plane2.addComponent(mirrorMaterial2);
+
+	scene.addObject(plane2);
 
 	var raptor = new SceneObject(gl);
 	var raptorRenderer = new Renderer(gl);
